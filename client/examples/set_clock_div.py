@@ -11,6 +11,7 @@ if __name__ == "__main__":
             help='Serial port name. Default is /dev/ttyACM0.')
     parser.add_argument('-d', '--divider', type=int, choices=range(256))
     parser.add_argument('-m', '--mode', type=int, choices=range(2))
+    parser.add_argument('-s', '--prescaler', type=int, choices=range(8))
     args = parser.parse_args()
 
     print("Creating controller on port {}".format(args.port))
@@ -29,7 +30,12 @@ if __name__ == "__main__":
         print("GCLK.DIV = {}, setting to {}".format(old_div, args.divider))
         mon.clock_divider = args.divider
 
-    print("GCLK frequency: {}Hz".format(mon.fclk()))
+    if args.prescaler is not None:
+        old_prescaler = mon.adc_prescaler
+        print("ADC.PRESCALER = {}, setting to {}".format(old_prescaler, args.prescaler))
+        mon.adc_prescaler = args.prescaler
+    
+    print("ADC sample rate: {} ksps".format(mon.adc_sample_rate() / 1000.))
 
 
 

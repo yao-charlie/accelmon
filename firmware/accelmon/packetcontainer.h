@@ -11,6 +11,8 @@
 #define RESP_TYPE_FCLK      0x2
 #define RESP_TYPE_DIV       0x3
 #define RESP_TYPE_DIV_MODE  0x4
+#define RESP_TYPE_ADC_PRE   0x5
+#define RESP_TYPE_SAMPLE_COUNT  0x6
 
 
 #define MAX_PACKET_LENGTH 64

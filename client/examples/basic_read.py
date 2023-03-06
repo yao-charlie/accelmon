@@ -13,5 +13,6 @@ if __name__ == "__main__":
     pt = board.Controller(port=args.port)
 
     print("Board ID: {}".format(pt.board_id()))
+    print("Last sample count: {}".format(pt.sample_count()))
 
 

@@ -1,7 +1,7 @@
 #include "adc_util.h"
 #include <Arduino.h>
 
-void init_ADC(uint16_t const genclk_id) 
+void init_ADC(uint16_t const genclk_id, uint8_t const adc_prescaler /* = 0*/) 
 {
   // select the generic clock generator used as clock source GCLK_CLKCTRL_GEN_GCLK5
   GCLK->CLKCTRL.reg = (GCLK_CLKCTRL_CLKEN | genclk_id | GCLK_CLKCTRL_ID_ADC);
@@ -20,7 +20,7 @@ void init_ADC(uint16_t const genclk_id)
   ADC->INPUTCTRL.reg |= ADC_INPUTCTRL_GAIN_DIV2 | ADC_INPUTCTRL_MUXNEG_GND | ADC_INPUTCTRL_MUXPOS_PIN0;
   while (ADC->STATUS.bit.SYNCBUSY);
   
-  ADC->CTRLB.reg |= ADC_CTRLB_PRESCALER(0) | ADC_CTRLB_RESSEL_12BIT | ADC_CTRLB_FREERUN; 
+  ADC->CTRLB.reg |= ADC_CTRLB_PRESCALER(adc_prescaler) | ADC_CTRLB_RESSEL_12BIT | ADC_CTRLB_FREERUN; 
   while (ADC->STATUS.bit.SYNCBUSY);
 
   // setup the interrupt

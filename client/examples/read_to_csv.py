@@ -12,11 +12,11 @@ if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
     
-    parser = argparse.ArgumentParser(description='Read ADXL-1005 over serial')
+    parser = argparse.ArgumentParser(description='Read SAMD21 ADC over serial')
     parser.add_argument('-m','--max-count', type=int, default=0,  
             help='Maximum number of samples to record. Default 0 (no maximum)')
     parser.add_argument('-t','--timeout', type=int, default=0,  
-            help='Collection time for sampling (s). Default is 0 (no timeout). The nominal sample rate is 5Hz.')
+            help='Collection time for sampling (s). Default is 0 (no timeout)')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',  
             help='Serial port name. Default is /dev/ttyACM0.')
     parser.add_argument('filename', help='CSV file for data output')
@@ -29,15 +29,15 @@ if __name__ == "__main__":
     csv = CsvSampleSink(args.filename)
     csv.open()
     
-    pt = board.Controller(port=args.port, sinks=[csv])
-    logging.info("Board ID: {}".format(pt.board_id()))
+    mon = board.Controller(port=args.port, sinks=[csv])
+    logging.info("Board ID: {}".format(mon.board_id()))
 
     logging.info("Main: creating thread")
-    x = threading.Thread(target=pt.collect_samples, args=(args.max_count,))
+    x = threading.Thread(target=mon.collect_samples, args=(args.max_count,))
     logging.info("Main: starting thread")
     x.start()
     
-    t = threading.Timer(args.timeout, pt.stop_collection)
+    t = threading.Timer(args.timeout, mon.stop_collection)
     if args.timeout > 0:
         t.start()
 

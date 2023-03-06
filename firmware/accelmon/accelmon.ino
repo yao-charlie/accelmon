@@ -19,14 +19,20 @@ struct RunConfig
   RunConfig() 
     : started(false), clk_div(240), 
       clk_divsel(GCLK_DIVSEL_DIRECT), 
+      adc_prescaler(0),
       fclk(48000000)
   {
     
   }
   
+  uint32_t adc_clk_est() const {
+    return fclk >> (adc_prescaler + 2);
+  }
+
   bool started;
-  uint32_t clk_div;
+  uint8_t clk_div;
   DIVSEL_T clk_divsel;
+  uint8_t adc_prescaler;
   uint32_t fclk;
 } cfg;
 
@@ -106,12 +112,14 @@ void loop()
 // H : halt, send last packet then halt packet
 // R# : start with max packets count as string (0=no max), streams packets HDR_DATA | timestamp_ms | T .. | P ..
 // C : configure
-//  D# : clock divisor
+//  D# : clock divisor (0-255 for direct, 0-8 for pow2)
 //  M# : clock divisor mode (0=direct, 1=pow2)
+//  P# : ADC prescaler (2^(x + 4))
 // A : ask
-//  F : clock frequency
+//  F : ADC clock frequency
 //  D : clock divisor
 //  M : clock divisor mode (0=direct, 1 = pow2)
+//  P : ADC prescaler setting
 // Z : reset the board
 void process_serial_buffer()
 {
@@ -122,7 +130,11 @@ void process_serial_buffer()
       stop_ADC();
       cfg.started = false;
 
-      pixels.clear();
+      if (dropped_count == 0) {
+        pixels.clear();
+      } else {
+        pixels.setPixelColor(0, pixels.Color(96, 0, 0));
+      }
       pixels.show();
 
   } else if (!cfg.started) {
@@ -141,6 +153,7 @@ void process_serial_buffer()
      
       packet.sample_count = 0;
       cfg.started = true;
+      dropped_count = 0;
       result_ready = false;
       start_ADC();
     } else if (data_in == 'C') {
@@ -152,6 +165,13 @@ void process_serial_buffer()
       } else if (cfg_opt == 'M') {
         cfg.clk_divsel = Serial.parseInt() == 0 ? GCLK_DIVSEL_DIRECT : GCLK_DIVSEL_POW2;
         invalidate_clk = true;
+      } else if (cfg_opt == 'P') {
+        uint8_t const pval = Serial.parseInt();
+        if ((pval != cfg.adc_prescaler) &&  (pval < 8)) {        
+          cfg.adc_prescaler = pval;
+          stop_ADC();
+          init_ADC(GCLK_CLKCTRL_GEN_GCLK5, cfg.adc_prescaler);
+        }
       } 
 
       if (invalidate_clk) {
@@ -162,13 +182,17 @@ void process_serial_buffer()
       uint8_t count = 0;
       if (ask_opt == 'F') {
         //Serial.println(cfg.fclk);        
-        count = packet.write_resp(RESP_TYPE_FCLK, cfg.fclk);        
+        count = packet.write_resp(RESP_TYPE_FCLK, cfg.adc_clk_est());        
       } else if (ask_opt == 'D') {
         //Serial.println(cfg.clk_div);
         count = packet.write_resp(RESP_TYPE_DIV, cfg.clk_div);        
       } else if (ask_opt == 'M') {
         //Serial.println((int)cfg.clk_divsel);
         count = packet.write_resp(RESP_TYPE_DIV_MODE, cfg.clk_divsel);        
+      } else if (ask_opt == 'P') {
+        count = packet.write_resp(RESP_TYPE_ADC_PRE, cfg.adc_prescaler);        
+      } else if (ask_opt == 'C') {  // sample count
+        count = packet.write_resp(RESP_TYPE_SAMPLE_COUNT, packet.sample_count);        
       } else if (ask_opt == 'B') {  /// board ID
         count = packet.write_resp(RESP_TYPE_ID, 0xB0A4D001);
       }

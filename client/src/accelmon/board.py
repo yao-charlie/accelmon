@@ -26,6 +26,8 @@ class Controller:
         FCLK     = 0b010
         DIV      = 0b011
         DIV_MODE = 0b100
+        ADC_PRE  = 0b101
+        SAMPLE_COUNT = 0b110
 
     class GClkDividerMode:
         """Mode select for the GCLK divider"""
@@ -54,13 +56,27 @@ class Controller:
         """
         return self._ask_resp('B',self.ResponseType.ID)
 
-    def fclk(self):
-        """Request the calculated GCLK frequency 
+    def adc_clk_freq(self):
+        """Request the calculated ADC clock frequency 
 
-        :returns: the GCLK frequency in Hz
+        :returns: the ADC clock frequency in Hz (divide by 6 to get sample rate)
         """
         return self._ask_resp('F',self.ResponseType.FCLK)
-    
+
+    def adc_sample_rate(self):
+        """Request the calculated ADC sample rate
+
+        :returns: the calulated ADC sample rate (ADC clock rate / 6)
+        """
+        return self.adc_clk_freq() / 6.0
+
+    def sample_count(self):
+        """Request the sample count from the last run
+
+        :returns: the packet.sample_count field
+        """
+        return self._ask_resp('C',self.ResponseType.SAMPLE_COUNT)
+
     @property
     def clock_divider(self):
         """Request the GCLK divider setting 
@@ -96,6 +112,23 @@ class Controller:
             msg = bytes("CM{}".format(ival),"utf-8")
             ser.write(msg)
 
+    @property
+    def adc_prescaler(self):
+        """Request the ADC prescaler setting
+
+        :returns: the prescaler setting p such that the ADC clock is scaled by 2^(p+2)
+        """
+        return self._ask_resp('P',self.ResponseType.ADC_PRE)
+
+    @adc_prescaler.setter
+    def adc_prescaler(self, val):
+        """Set the ADC prescaler to p such that the ADC clock is scaled by 2^(p+2)"""
+        ival = int(val)
+        if ival < 0 or ival > 7:
+            raise ValueError("ADC prescaler must be in the range 0-7")
+        with self.comm as ser:
+            msg = bytes("CP{}".format(ival),"utf-8")
+            ser.write(msg)
 
     def stop_collection(self):
         """Request a stop of the collection of samples."""

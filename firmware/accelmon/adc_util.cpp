@@ -1,10 +1,10 @@
 #include "adc_util.h"
 #include <Arduino.h>
 
-void init_ADC() 
+void init_ADC(uint16_t const genclk_id) 
 {
-  // select the generic clock generator used as clock source 
-  GCLK->CLKCTRL.reg = (GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK5 | GCLK_CLKCTRL_ID_ADC);
+  // select the generic clock generator used as clock source GCLK_CLKCTRL_GEN_GCLK5
+  GCLK->CLKCTRL.reg = (GCLK_CLKCTRL_CLKEN | genclk_id | GCLK_CLKCTRL_ID_ADC);
   while (GCLK->STATUS.bit.SYNCBUSY);
 
   // Select reference, internal VCC/2

@@ -1,7 +1,9 @@
 #ifndef _adc_util_h
 #define _adc_util_h
 
-void init_ADC(int sample_rate_ksps); 
+#include <cstdint>
+
+void init_ADC(uint16_t genclk_id); 
 void start_ADC();
 void stop_ADC();
 void reset_ADC();

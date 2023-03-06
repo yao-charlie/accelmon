@@ -2,41 +2,69 @@
 #define packet_container_h_
 
 
-#define HDR_TYPE_DATA (0x1 << 6)
-#define HDR_TYPE_SYNC (0x2 << 6)
-#define PACKET_LENGTH 64
+#define HDR_TYPE_DATA 0x1
+#define HDR_TYPE_RESP 0x2
+#define HDR_TYPE_HALT 0x3
 
-struct PacketContainer 
+#define RESP_TYPE_RSVD      0x0
+#define RESP_TYPE_ID        0x1
+#define RESP_TYPE_FCLK      0x2
+#define RESP_TYPE_DIV       0x3
+#define RESP_TYPE_DIV_MODE  0x4
+
+
+#define MAX_PACKET_LENGTH 64
+
+class PacketContainer 
 {
-  PacketContainer() : pos(0), align_left(true), count(0) {}
+public:
   
-  uint8_t buf[PACKET_LENGTH];
-  uint8_t pos;
-  bool align_left;
-  uint32_t count;
+ PacketContainer() : max_packets(0), sample_count(0), pos(1) {}
 
-  void reset_for_write() {
-    buf[0] = 0;        // clear count
-    pos = 1;           // start at byte 1 (byte 0 is header),
-    align_left = true; // first 12 bits align left
-  }
+  uint32_t max_packets;
+  uint32_t sample_count;
+  uint8_t const* buffer() const { return &buf[0]; }
 
-  void append(uint16_t val)
+  int8_t write_resp(uint8_t resp_type, uint32_t val)
   {
-    // adc_val is 16 bits with upper 4 bits = 0 (12 bit ADC result)
-    uint8_t inc_pos;
-    if (align_left) {   // byte 0 is header, byte 1 shift up
-      val <<= 4;    // left align
-      inc_pos = 1;
-    } else {            // right align and store existing 4 bits at top
-      val |= (buf[pos] & 0xF0) << 8;
-      inc_pos = 2;
-    }
-    *(uint16_t*)(&buf[pos]) = val;
-    pos += inc_pos;
-    align_left = !align_left;
-    buf[0] += 1;
+    buf[0] = (HDR_TYPE_RESP << 6) | (resp_type << 3);
+    write_to_buf(val, &buf[1]);
+    return 5;
   }
+  int8_t write_halt() 
+  {
+    buf[0] = HDR_TYPE_HALT << 6;
+    write_to_buf(sample_count, &buf[1]);
+    return 5;
+  }
+  bool append_sample(uint16_t data) 
+  {
+    write_to_buf(data, &buf[pos]);
+    sample_count++;
+    pos += 2;   // sizeof(uint16_t)
+    if (pos >= (MAX_PACKET_LENGTH-2)) { 
+      buf[0] = (HDR_TYPE_DATA << 6) | pos;
+      return true;
+    }
+    return false;
+  }
+
+  uint8_t byte_count() const { return pos; }
+  void reset() { pos = 1; }
+
+private:
+  uint8_t pos;
+  uint8_t buf[MAX_PACKET_LENGTH];
+
+  template<typename T>
+  void write_to_buf(T v, uint8_t* start) 
+  {
+    uint8_t const* bvals = reinterpret_cast<uint8_t const*>(&v);
+    for (int8_t i = 0; i < sizeof(T); ++i) {
+      *start++ = bvals[sizeof(T)-1-i];   // MSB first
+    }
+  }
+
   
 };
 

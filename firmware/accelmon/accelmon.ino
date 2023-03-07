@@ -12,6 +12,8 @@
 #include "port_util.h"
 #include "packetcontainer.h"
 
+#define DOUT_IOPIN 7
+
 void process_serial_buffer();
 
 struct RunConfig
@@ -48,6 +50,7 @@ volatile uint32_t timestamp_us;
 
 void ADC_Handler() 
 {
+  PORT->Group[PORTA].OUTTGL.reg = (1 << DOUT_IOPIN); 
   if (!result_ready) {
     //timestamp_us = TC4->COUNT32.COUNT.reg;
     adc_val = 0x0FFF & ADC->RESULT.reg;     // uint16_t
@@ -68,6 +71,8 @@ void setup()
   pixels.setPixelColor(0, pixels.Color(0, 96, 0));
   pixels.show();
     
+  init_pin_for_D_out(DOUT_IOPIN);
+  PORT->Group[PORTA].OUTCLR.reg = (1 << DOUT_IOPIN); 
   //Serial.println("Hello accelo");
 
   init_pin_for_CLK_out();

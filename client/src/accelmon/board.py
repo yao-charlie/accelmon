@@ -66,9 +66,9 @@ class Controller:
     def adc_sample_rate(self):
         """Request the calculated ADC sample rate
 
-        :returns: the calulated ADC sample rate (ADC clock rate / 6)
+        :returns: the calulated ADC sample rate (ADC clock rate / 7)
         """
-        return self.adc_clk_freq() / 6.0
+        return self.adc_clk_freq() / 7.0
 
     def sample_count(self):
         """Request the sample count from the last run

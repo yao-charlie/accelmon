@@ -29,10 +29,8 @@ class CsvSampleSink (SampleSink):
         self.hf = None
 
     def write(self, sample):
-        seps = [', ']*len(sample)
-        seps[-1] = '\n'
-        for v,s in zip(sample,seps):
-            self.hf.write("{}{}".format(v,s).replace("[","").replace("]",""))
+        for s in sample:
+            self.hf.write("{}\n".format(s))
 
 class ListSampleSink (SampleSink):
     """Write sample data to an array"""

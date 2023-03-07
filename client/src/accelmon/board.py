@@ -48,7 +48,12 @@ class Controller:
         self.comm.baudrate = baudrate
         self.user_halt = False
         self.sinks = sinks
-    
+   
+    def halt(self):
+        """Send a halt command"""
+        with self.comm as ser:
+            ser.write(bytes("H","utf-8"))
+
     def board_id(self):
         """Get the ID of the connected board
 

@@ -41,8 +41,6 @@ struct RunConfig
 // create a pixel strand with 1 pixel on PIN_NEOPIXEL
 Adafruit_NeoPixel pixels(1, PIN_NEOPIXEL);
 
-bool led_state = false;
-
 volatile bool result_ready;
 volatile uint16_t adc_val;
 volatile uint32_t dropped_count;
@@ -101,14 +99,12 @@ void loop()
     if (packet.append_sample(sample)) {
       Serial.write(packet.buffer(), packet.byte_count());
       packet.reset();    
-      led_state = !led_state;
     }        
     if ((packet.max_packets > 0) && (packet.sample_count >= packet.max_packets)) {
       stop_ADC();
       cfg.started = false;
       Serial.write(packet.buffer(), packet.byte_count());
       packet.reset();
-      led_state = false;
     }
   }
 }

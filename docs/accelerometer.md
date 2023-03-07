@@ -23,7 +23,7 @@ Reference: https://blog.thea.codes/understanding-the-sam-d21-clocks/
 * GCLKs can be configured with a divider to scale the output frequency: an 8-bit DIV field is set in the GENDIV register
 * There are two clock divider modes that can be configured for a GCLK using the DIVSEL field of the GENDIV register
   * DIVSEL=0: direct scaling with DIV cycles of the source clock equivalent to one ouput cycle from the GCLK (DIV=0 or 1 is equivalent to passing the source clock)
-  * DIVSEL=1: DIV is interpreted in powers of 2 to scale the source clock
+  * DIVSEL=1: DIV is interpreted in powers of 2 to scale the source clock. **Maximum value for DIV seems to be limited to 8 in this case?**
 
 When initializing a GCLK, disable the GCLK first by clearing the enable flag in GENCTRL and CLKCTRL 
 
@@ -86,6 +86,14 @@ In the code block from the previous section, the `GCLK_GENCTRL_OE` flag is set t
 
 ### SAMD21 ADC Configuration
 
+###### References
+
+* https://forcetronic.blogspot.com/2016/10/utilizing-advanced-adc-capabilities-on.html
+* https://community.atmel.com/forum/samd21-adc-interrupt-routine
+* https://www.eevblog.com/forum/microcontrollers/pin-multiplexing-in-samd21/
+* https://github.com/ataradov/mcu-starter-projects/blob/master/samd21/hal_gpio.h
+* https://forum.arduino.cc/t/arduino-m0-pro-adc-free-running-with-interrupt/471688
+
 Using the GCLK configured in the previous section, the next step is to configure the ADC in free-running mode. This requires
 
 * configure the IO pin in the port multiplexer to direct input to the ADC
@@ -117,7 +125,12 @@ while (GCLK->STATUS.bit.SYNCBUSY);
 For this application
 
 * Use the internal reference VCC/2 in combination with DIV2 gain to use the full VCC range
+  * when gain is set to DIV2, an additional clock cycle is used in the conversion
+
 * Don't use averaging or repeated sampling to gain extended precision
+* Use the minimum sample time (SAMPCTRL.SAMPLEN = 0), equivalent to a half ADC clock cycle
+  * this could be increased depending on requirements, but should be long enough for lower sample rates
+
 * Set the negative input of the ADC to ground (single ended measurement)
 * Use the lowest prescaler setting (DIV4) to generate the ADC clock from the input GCLK
 * Operate the ADC at 12-bit resolution in free-running mode
@@ -127,13 +140,110 @@ For this application
 
 The ADC includes an internal prescaler with a minimum clock division of 4. To operate the ADC at it's maximum sample rate, the GCLK input should be 4 x 2.1MHz = 8.4MHz (the closest internal clock that can be generated from the 48MHz source would be DIV=6: 8MHz). 
 
-The minimum ADC clock rate is defined as 30kHz: the input clock would be 120kHz with the DIV4 prescaler setting and the sample rate would be 5ksps in free-running mode (6 cycles per conversion). Below this rate, single shot conversions are required or multiple conversions can be accumulated or averaged. 
+The minimum ADC clock rate is defined as 30kHz: the input clock would be 120kHz with the DIV4 prescaler setting and the sample rate would be 5ksps in free-running mode (6 cycles per conversion, no gain). Below this rate, single shot conversions are required or multiple conversions can be accumulated or averaged. 
 
 ##### USB Transfer Rate Considerations
 
 The USB1.1 data transfer rate is 12Mbps. This is a raw data rate, and in practice transfers will be slower. Assuming two byte words, data rates below 500kwps are expected. The USB transfers are hidden behind the serial port interface for the Arduino boards. Not tested.
 
+##### ADC Initialization
 
+Implementing the configuration described above,
+
+* the combination of using the VCC/2 reference and DIV2 gain gives full 0-VCC range
+* it's important to reset the SAMPCTRL register, which is initialized to a larger value by the default Arduino libraries
+* The variable `adc_presscaler`  is an input to select the ADC clock prescaler configuration
+
+```c
+// Select reference, internal VCC/2
+// combine with gain DIV2 for full VCC range
+ADC->REFCTRL.reg |= ADC_REFCTRL_REFSEL_INTVCC1; 
+
+// Average control 1 sample, no right-shift (default)
+// ADC->AVGCTRL.reg |= ADC_AVGCTRL_ADJRES(0) | ADC_AVGCTRL_SAMPLENUM_1;
+
+// Sampling time, no extra sampling half clock-cycles
+ADC->SAMPCTRL.reg = ADC_SAMPCTRL_SAMPLEN(0);
+
+// Input control: set gain to div by two so ADC has measurement range of VCC, 
+// no diff measurement so set neg to gnd, pos input set to pin 0 or A0
+ADC->INPUTCTRL.reg |= ADC_INPUTCTRL_GAIN_DIV2 | ADC_INPUTCTRL_MUXNEG_GND | ADC_INPUTCTRL_MUXPOS_PIN0;
+while (ADC->STATUS.bit.SYNCBUSY);
+  
+ADC->CTRLB.reg = ADC_CTRLB_PRESCALER(adc_prescaler) | ADC_CTRLB_RESSEL_12BIT | ADC_CTRLB_FREERUN; 
+while (ADC->STATUS.bit.SYNCBUSY);
+```
+
+##### Interrupt Configuration
+
+Use the interrupt handler to capture the raw result when the conversion is complete. The interrupt should be enabled in the ADC.INTENSET register, then the interrupt handler is enabled:
+
+```C
+// setup the interrupt
+ADC->INTENSET.reg |= ADC_INTENSET_RESRDY; // enable ADC interrupt on result ready
+while (ADC->STATUS.bit.SYNCBUSY);
+
+NVIC_SetPriority(ADC_IRQn, 3); //set priority of the interrupt
+NVIC_EnableIRQ(ADC_IRQn); // enable ADC interrupts
+```
+
+##### Starting and Stopping the ADC
+
+To start the ADC in free-running mode, enable the ADC then trigger a soft start once.
+
+```c
+ADC->CTRLA.bit.ENABLE = 1;
+while (ADC->STATUS.bit.SYNCBUSY);
+  
+ADC->SWTRIG.reg = ADC_SWTRIG_START; // Start ADC conversion
+while(ADC->STATUS.bit.SYNCBUSY);    // Wait for sync
+```
+
+To stop the ADC, disable it.
+
+```C
+ADC->CTRLA.bit.ENABLE = 0;
+while (ADC->STATUS.bit.SYNCBUSY);
+```
+
+### Collecting ADC Samples
+
+The interrupt handler is used to capture the raw result from the ADC. The result is stored in a temporary variable (not processed) and a second flag is used as an interlock to ensure that the new result is transferred to the output buffer. 
+
+To assist with validating the timing, an additional IO pin is configured as a digital output, and its state is toggled each time the result ready (RESRDY) interrupt is triggered.
+
+```C
+volatile bool result_ready;
+volatile uint16_t adc_val;
+volatile uint32_t dropped_count;
+
+void ADC_Handler() 
+{
+  PORT->Group[PORTA].OUTTGL.reg = (1 << DOUT_IOPIN); 
+  if (!result_ready) {
+    adc_val = 0x0FFF & ADC->RESULT.reg;
+    result_ready = true;
+  } else {
+    dropped_count++;
+  }
+  ADC->INTFLAG.bit.RESRDY = 1;  // write a bit to clear interrupt
+}
+
+// ...
+void loop()
+{
+  // ...
+  if (result_ready) {
+    uint16_t const sample = adc_val;	// copy
+    result_ready = false;				// clear lock
+    // do something here
+  }
+}
+```
+
+In the following test case, the GCLK divider is set to 200, DIVSEL=0, which results in a 240kHz GCLK source for the ADC. The ADC prescaler is set to DIV4 (ADC clock is 80kHz) and the gain to DIV2 (7 clock cycles per conversion), which results in a conversion time of 58.333us (sample rate of 17.143ksps). The conversion frame is illustrated by the toggling of the digital IO pin (CH2) and the clock input to the ADC (before prescaler) is shown on CH1.
+
+![ADC conversions and GCLK input](./images/SDS00002.png)
 
 
 

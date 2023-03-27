@@ -28,6 +28,7 @@ class Controller:
         DIV_MODE = 0b100
         ADC_PRE  = 0b101
         SAMPLE_COUNT = 0b110
+        ADC_SAMPLEN = 0b111
 
     class GClkDividerMode:
         """Mode select for the GCLK divider"""
@@ -64,16 +65,17 @@ class Controller:
     def adc_clk_freq(self):
         """Request the calculated ADC clock frequency 
 
-        :returns: the ADC clock frequency in Hz (divide by 6 to get sample rate)
+        :returns: the ADC clock frequency in Hz
         """
         return self._ask_resp('F',self.ResponseType.FCLK)
 
     def adc_sample_rate(self):
         """Request the calculated ADC sample rate
 
-        :returns: the calulated ADC sample rate (ADC clock rate / 7)
+        :returns: the calulated ADC sample rate (ADC clock rate / (6 + 1[Gain] + SAMPLEN))
         """
-        return self.adc_clk_freq() / 7.0
+        L = self._ask_resp('L', self.ResponseType.ADC_SAMPLEN)
+        return self.adc_clk_freq() / (7.0 + 0.5*L)
 
     def sample_count(self):
         """Request the sample count from the last run
@@ -134,6 +136,25 @@ class Controller:
         with self.comm as ser:
             msg = bytes("CP{}".format(ival),"utf-8")
             ser.write(msg)
+
+    @property
+    def adc_samplen(self):
+        """Request the ADC sample length setting
+
+        :returns: the sample length L such that L+1 half-cycles of the ADC clock are used to sample the signal
+        """
+        return self._ask_resp('L',self.ResponseType.ADC_SAMPLEN)
+
+    @adc_samplen.setter
+    def adc_samplen(self, val):
+        """Set the ADC sample length to L such that L+1 half-cycles of the ADC clockare used to sample the signal"""
+        ival = int(val)
+        if ival < 0 or ival > 63:
+            raise ValueError("ADC sample length must be in the range 0-63")
+        with self.comm as ser:
+            msg = bytes("CL{}".format(ival),"utf-8")
+            ser.write(msg)
+
 
     def stop_collection(self):
         """Request a stop of the collection of samples."""

@@ -1,7 +1,7 @@
 #include "adc_util.h"
 #include <Arduino.h>
 
-void init_ADC(uint16_t const genclk_id, uint8_t const adc_prescaler /* = 0*/) 
+void init_ADC(uint16_t const genclk_id, uint8_t const adc_prescaler /* = 0*/, uint8_t const adc_samplen /* = 0*/) 
 {
   // select the generic clock generator used as clock source GCLK_CLKCTRL_GEN_GCLK5
   GCLK->CLKCTRL.reg = (GCLK_CLKCTRL_CLKEN | genclk_id | GCLK_CLKCTRL_ID_ADC);
@@ -13,9 +13,8 @@ void init_ADC(uint16_t const genclk_id, uint8_t const adc_prescaler /* = 0*/)
   // Average control 1 sample, no right-shift
   // ADC->AVGCTRL.reg |= ADC_AVGCTRL_ADJRES(0) | ADC_AVGCTRL_SAMPLENUM_1;
 
-  // Sampling time, no extra sampling half clock-cycles
-  //REG_ADC_SAMPCTRL = ADC_SAMPCTRL_SAMPLEN(0);
-  ADC->SAMPCTRL.reg = ADC_SAMPCTRL_SAMPLEN(0);
+  // Sampling time = (SAMPLEN+1)*(CLK_ADC/2), adds half clock-cycles
+  ADC->SAMPCTRL.reg = ADC_SAMPCTRL_SAMPLEN(adc_samplen);
   
   // Input control: set gain to div by two so ADC has measurement range of VCC, no diff measurement so set neg to gnd, pos input set to pin 0 or A0
   // ADC_INPUTCTRL_GAIN_DIV2 |   

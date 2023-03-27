@@ -247,7 +247,43 @@ In the following test case, the GCLK divider is set to 200, DIVSEL=0, which resu
 
 
 
+### Adjusting Sample Time
+
+The ```SAMPCTRL.SAMPLEN``` register field enables the adjustment of the sample time relative to the number of half-cycles of the ADC clock. The following four configurations illustrate the timing behaviour. In each case, the ```GENCTRL.DIVSEL```  field is set to 0 (direct clock division), the ADC clock prescaler is DIV4, and the ADC gain is DIV2. The system clock (48MHz) has a 20.83 ns period.
+
+| SAMPCTRL.SAMPLEN | GENDIV.DIV | T_GCLK (us) | T_ADC_CLK (us) | N_CONV (ADC_CLK) | T_CONV (us) | R (ksps) |
+| ---------------- | ---------- | ----------- | -------------- | ---------------- | ----------- | -------- |
+| 0                | 86         | 1.792       | 7.167          | 7                | 50.167      | 19.93    |
+| 1                | 75         | 1.562       | 6.250          | 7.5              | 46.875      | 21.33    |
+| 5                | 60         | 1.250       | 5.000          | 9.5              | 47.500      | 21.05    |
+| 9                | 50         | 1.042       | 4.167          | 11.5             | 47.917      | 20.87    |
+| 10               | 50         | 1.042       | 4.167          | 12               | 50.000      | 20.00    |
+| 16               | 50         | 1.042       | 4.167          | 15               | 62.500      | 16.00    |
+
+![ADC conversion with SAMPLEN=0](./images/L0_DIV4_D86_M0.png)
+
+![ADC conversion with SAMPLEN=1](./images/L1_DIV4_D75_M0.png)
+
+![ADC conversion with SAMPLEN=5](./images/L5_DIV4_D60_M0.png)
+
+![ADC conversion with SAMPLEN=9](./images/L9_DIV4_D50_M0.png)
 
 
 
+## ADC Results
 
+TODO: the test jig description & limitations
+
+The following results are captured for a 2kHz sinusoidal input at a 1V offset, 0.1Vpp amplitude. The GCLK divider is adjusted to get close to a sample rate of 20 ksps.
+
+* The frequency analysis starts after 100ms (there is some residual data early in the stream that should be trimmed)
+* Increasing the sample length reduces the noise
+* Should try a longer sample lengths and lower sample rates 
+
+![SAMPLEN=0 approximately 20ksps](./images/spectrum_sine2kHz_Va0p1_L0_D85.png)
+
+
+
+![SAMPLEN=5 approximately 20ksps](./images/spectrum_sine2kHz_Va0p1_L5_D60.png)
+
+![SAMPLEN=10 approximately 20ksps](./images/spectrum_sine2kHz_Va0p1_L10_D50.png)

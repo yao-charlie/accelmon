@@ -1,0 +1,12 @@
+{
+    "port" : "/dev/ttyACM0",
+    "adc" : {
+        "prescaler" : 0,
+        "gclk" : {
+            "divider" : 50,
+            "divsel" : 0
+        }, 
+        "samplen" : 16
+    }
+
+}

@@ -24,11 +24,19 @@ void init_pin_for_CLK_out()
   PORT->Group[PORTA].PMUX[iopin >> 1].reg = PORT_PMUX_PMUXE_H | PORT_PMUX_PMUXO_H;  // type H for CLK
 }
 
-// digital out
-//  + SAMD21: PA07
-//  + Adafruit QTPy: Pin 7
+// digital out, initializes pin to 0
+// example: SAMD21: PA07 is equivaletn to Adafruit QTPy D7/A7/RX
 void init_pin_for_D_out(int const iopin)
 {
   PORT->Group[PORTA].DIRSET.reg = (1 << iopin);     // output PA07
   PORT->Group[PORTA].PINCFG[iopin].bit.PMUXEN = 0;  // disable peripheral mux
+  PORT->Group[PORTA].OUTCLR.reg = (1 << iopin); 
 }
+
+// digital in
+void init_pin_for_D_in(int const iopin)
+{
+  PORT->Group[PORTA].DIRCLR.reg = (1 << iopin);     // input at PA[iopin]
+  PORT->Group[PORTA].PINCFG[iopin].bit.PMUXEN = 0;  // disable peripheral mux
+}
+

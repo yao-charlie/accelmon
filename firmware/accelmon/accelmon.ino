@@ -12,7 +12,11 @@
 #include "port_util.h"
 #include "packetcontainer.h"
 
-#define DOUT_IOPIN 7
+// IO Pins from SAMD
+#define SELF_TEST_IOPIN 16  // D4/SDA
+#define STBY_IOPIN 17       // D5/SCL
+#define OR_IOPIN 6          // D6/A6/TX
+#define ADC_CONV_IOPIN 7    // D7/A7/RX
 
 void process_serial_buffer();
 
@@ -22,6 +26,7 @@ struct RunConfig
     : started(false), clk_div(240), 
       clk_divsel(GCLK_DIVSEL_DIRECT), 
       adc_prescaler(0),
+      adc_samplen(0),
       fclk(48000000)
   {
     
@@ -35,6 +40,7 @@ struct RunConfig
   uint8_t clk_div;
   DIVSEL_T clk_divsel;
   uint8_t adc_prescaler;
+  uint8_t adc_samplen;
   uint32_t fclk;
 } cfg;
 
@@ -48,7 +54,7 @@ volatile uint32_t timestamp_us;
 
 void ADC_Handler() 
 {
-  PORT->Group[PORTA].OUTTGL.reg = (1 << DOUT_IOPIN); 
+  PORT->Group[PORTA].OUTTGL.reg = (1 << ADC_CONV_IOPIN); 
   if (!result_ready) {
     //timestamp_us = TC4->COUNT32.COUNT.reg;
     adc_val = 0x0FFF & ADC->RESULT.reg;     // uint16_t
@@ -69,8 +75,11 @@ void setup()
   pixels.setPixelColor(0, pixels.Color(0, 96, 0));
   pixels.show();
     
-  init_pin_for_D_out(DOUT_IOPIN);
-  PORT->Group[PORTA].OUTCLR.reg = (1 << DOUT_IOPIN); 
+  init_pin_for_D_out(ADC_CONV_IOPIN);
+  init_pin_for_D_out(STBY_IOPIN);
+  init_pin_for_D_out(SELF_TEST_IOPIN);
+  init_pin_for_D_in(OR_IOPIN);
+  
   //Serial.println("Hello accelo");
 
   init_pin_for_CLK_out();
@@ -116,11 +125,13 @@ void loop()
 //  D# : clock divisor (0-255 for direct, 0-8 for pow2)
 //  M# : clock divisor mode (0=direct, 1=pow2)
 //  P# : ADC prescaler (2^(x + 4))
+//  L# : ADC sample length (half-clock cycles)
 // A : ask
 //  F : ADC clock frequency
 //  D : clock divisor
 //  M : clock divisor mode (0=direct, 1 = pow2)
 //  P : ADC prescaler setting
+//  L : ADC sample length
 // Z : reset the board
 void process_serial_buffer()
 {
@@ -160,6 +171,7 @@ void process_serial_buffer()
     } else if (data_in == 'C') {
       char const cfg_opt = Serial.read();      
       bool invalidate_clk = false;
+      bool invalidate_adc = false;
       if (cfg_opt == 'D') {
         cfg.clk_div = Serial.parseInt();        
         invalidate_clk = true;
@@ -170,13 +182,22 @@ void process_serial_buffer()
         uint8_t const pval = Serial.parseInt();
         if ((pval != cfg.adc_prescaler) &&  (pval < 8)) {        
           cfg.adc_prescaler = pval;
-          stop_ADC();
-          init_ADC(GCLK_CLKCTRL_GEN_GCLK5, cfg.adc_prescaler);
+          invalidate_adc = true;
+        }
+      } else if (cfg_opt == 'L') {
+        uint8_t const lval = Serial.parseInt();
+        if ((lval != cfg.adc_samplen) &&  (lval < 64)) {        
+          cfg.adc_samplen = lval;
+          invalidate_adc = true;
         }
       } 
 
       if (invalidate_clk) {
         cfg.fclk = init_GCLK(5, cfg.clk_div, cfg.clk_divsel, true);  
+      }
+      if (invalidate_adc) {
+          stop_ADC();
+          init_ADC(GCLK_CLKCTRL_GEN_GCLK5, cfg.adc_prescaler, cfg.adc_samplen);
       }
     } else if (data_in == 'A') {
       char const ask_opt = Serial.read();
@@ -192,6 +213,8 @@ void process_serial_buffer()
         count = packet.write_resp(RESP_TYPE_DIV_MODE, cfg.clk_divsel);        
       } else if (ask_opt == 'P') {
         count = packet.write_resp(RESP_TYPE_ADC_PRE, cfg.adc_prescaler);        
+      } else if (ask_opt == 'L') {
+        count = packet.write_resp(RESP_TYPE_ADC_SAMPLEN, cfg.adc_samplen);        
       } else if (ask_opt == 'C') {  // sample count
         count = packet.write_resp(RESP_TYPE_SAMPLE_COUNT, packet.sample_count);        
       } else if (ask_opt == 'B') {  /// board ID

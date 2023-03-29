@@ -1,3 +1,5 @@
+
+
 # Accelerometer
 
 ## Overview
@@ -259,6 +261,12 @@ The ```SAMPCTRL.SAMPLEN``` register field enables the adjustment of the sample t
 | 9                | 50         | 1.042       | 4.167          | 11.5             | 47.917      | 20.87    |
 | 10               | 50         | 1.042       | 4.167          | 12               | 50.000      | 20.00    |
 | 16               | 50         | 1.042       | 4.167          | 15               | 62.500      | 16.00    |
+
+The function for conversion time is (with gain DIV2)
+$$
+T_{conv} = (7+0.5N_{sampl})2^{P_{adc}+2}N_{div}T_{sysclk}
+$$
+Defining the sample rate as a ratio to the system clock frequency,
 
 ![ADC conversion with SAMPLEN=0](./images/L0_DIV4_D86_M0.png)
 

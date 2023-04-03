@@ -266,7 +266,11 @@ The function for conversion time is (with gain DIV2)
 $$
 T_{conv} = (7+0.5N_{sampl})2^{P_{adc}+2}N_{div}T_{sysclk}
 $$
-Defining the sample rate as a ratio to the system clock frequency,
+Defining the sample rate as a ratio to the system clock frequency, with $f_{sysclk} = 1/T_{sysclk}$  and $f_{sampl} = 1/T_{conv}$,
+$$
+\frac{f_{sysclk}}{r_{sample}}=(7+0.5N_{sampl})2^{P_{adc}+2}N_{div}
+$$
+
 
 ![ADC conversion with SAMPLEN=0](./images/L0_DIV4_D86_M0.png)
 

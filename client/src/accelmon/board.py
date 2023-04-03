@@ -1,5 +1,6 @@
 import serial
 import struct
+import threading
 
 class BadHeader(Exception):
     """An error in the packet header"""
@@ -8,6 +9,65 @@ class BadHeader(Exception):
 class BadPacket(Exception):
     """A packet has a formatting error"""
     pass
+
+class ClockSettings:
+    """Configuration for the on-chip ADC clock and sampling to define
+    the sample rate"""
+
+    F_SYS_CLK = 48000000
+
+    def __init__(self, r_sample, N_min=0, N_max=64):
+        """Initialize the clock settings for a target sample rate.
+        Note: the actual sample rate may differ due to the fixed
+        precision of the clock settings."""
+        self.D = None
+        self.N = None
+        self.P = None
+        
+        if r_sample < 5000 or r_sample > 300000:
+            raise ValueError('Sample rate must be in the range 5-300ksps ({}ksps)'.format(r_sample/1000.))
+
+        if N_min < 0 or N_max > 64 or N_max < N_min:
+            raise ValueError('Sample clocks N must define an increasing range in [0, 64) (N_min={}, N_max={})'.format(N_min, N_max))
+
+        # apply an extra factor of 2 for odd N
+        ratio = (2 * self.F_SYS_CLK) // r_sample
+
+        # Since min(r_sample) = 5000, max(ratio) = 2*48000/5 = 19200
+        # 19200 / (4*D_max) = 18.823.. --> force N_max = 5 if required
+        P = 0       # ADC Prescaler 2^(P+2)
+        rr = ratio // 4    # ADC prescaler
+
+        D_max = 256 # max value for the 8-bit DIV field 0xFF
+        if N_min == N_max:
+            N = N_min
+            D = int(rr / (14.0 + N))
+            while D >= D_max:
+                rr //= 2
+                P += 1
+                D = int(rr / (14.0 + N))
+            self.D = D
+            self.N = N
+            self.P = P
+        else: 
+            N = [i for i in range(N_min, N_max)]
+            N.reverse()
+            D = [int(rr / (14.0 + Ni)) for Ni in N]
+            max_err = ratio
+            errs = [abs(ratio - 4.0*(14 + ni)*di) if di < D_max else max_err for ni, di in zip(N,D)]
+            minpos = errs.index(min(errs))
+            self.D = D[minpos]
+            self.N = N[minpos]
+            self.P = P
+    
+    def T_conversion(self):
+        """Compute the conversion period T"""
+        T_sys = 1.0/self.F_SYS_CLK
+        return (7.0 + 0.5*self.N)*2**(self.P+2)*self.D*T_sys
+
+    def f_conversion(self):
+        """Compute the conversion frequency (sample rate)"""
+        return 1.0/self.T_conversion()
 
 class Controller:
     """A board controller for the Accelerometer board using serial communication"""
@@ -35,7 +95,7 @@ class Controller:
         DIRECT   = 0
         POW2     = 1
 
-    def __init__(self, port, baudrate=115200, sinks=[]):
+    def __init__(self, port=None, baudrate=115200, sinks=[]):
         """Construct a Controller with a specified port
 
         :param port: The serial port
@@ -44,16 +104,32 @@ class Controller:
             (default 115200 specified in firmware)
         :type baudrate: int
         """
-        self.comm = serial.Serial()
-        self.comm.port = port
-        self.comm.baudrate = baudrate
+        self.comm = None
+        self.reset_com_port(port=port, baudrate=baudrate)
         self.user_halt = False
         self.sinks = sinks
    
+    def set_sinks(self, sinks):
+        self.sinks = sinks
+
+    def reset_com_port(self, port, baudrate=115200):
+        if self.comm is not None:
+            self.comm.close()
+        self.comm = serial.Serial()
+        self.comm.port = port
+        self.comm.baudrate = baudrate
+
     def halt(self):
         """Send a halt command"""
         with self.comm as ser:
             ser.write(bytes("H","utf-8"))
+
+    def load_clk_config(self, cfg):
+        """Load the board configuration from ClockSettings"""
+        self.clock_divider = cfg.D
+        self.clock_divider_mode = 0
+        self.adc_prescaler = cfg.P
+        self.adc_samplen = cfg.N
 
     def board_id(self):
         """Get the ID of the connected board
@@ -170,6 +246,8 @@ class Controller:
         Collected samples are written to the sink(s).
         """
         sample_count = 0
+        writer_thread = None
+        write_data = []
         with self.comm as ser:
             msg = bytes("R","utf-8")+ struct.pack('<I',max_samples)
             ser.write(msg)
@@ -191,7 +269,7 @@ class Controller:
                 
                 raw_data = [struct.unpack('>H',ser.read(size=2))[0] for i in range(byte_count // 2)]
                 sample_count += len(raw_data)
-                
+
                 for sink in self.sinks:
                     sink.write(raw_data)
         
@@ -286,4 +364,14 @@ class Controller:
             raise BadHeader("Unexpected response type: 0x{:x}".format(hdr[0]))
 
         return (hdr[0] & 0x01) != 0
+    
+    def _validate_cfg_param(self, data, lbl, range):
+        if lbl not in data:
+            return None
+        v = int(data[lbl])
+        if v >= range[0] and v < range[1]: 
+            return v
+        else:
+            raise ValueError("{} out of range [{},{}] ({})".format(lbl, range[0], range[1], v))
+
 

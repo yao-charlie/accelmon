@@ -6,14 +6,10 @@
 #define HDR_TYPE_RESP 0x80
 #define HDR_TYPE_HALT 0xC0
 
-#define RESP_TYPE_RSVD      0x0
-#define RESP_TYPE_ID        0x1
-#define RESP_TYPE_FCLK      0x2
-#define RESP_TYPE_DIV       0x3
-#define RESP_TYPE_DIV_MODE  0x4
-#define RESP_TYPE_ADC_PRE   0x5
-#define RESP_TYPE_SAMPLE_COUNT  0x6
-#define RESP_TYPE_ADC_SAMPLEN   0x7
+#define RESP_TYPE_RSVD          0x0
+#define RESP_TYPE_ID            0x1
+#define RESP_TYPE_SAMPLE_COUNT  0x2
+
 
 #define M_PACKET_SIZE 8
 #define MAX_PACKET_LENGTH 256

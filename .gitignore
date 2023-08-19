@@ -54,5 +54,12 @@ dkms.conf
 # Python
 __pycache__/
 
+
+# Build
+develop-eggs/
+eggs/
+*.egg-info/
+*.egg
+
 # Raw data
 *.csv

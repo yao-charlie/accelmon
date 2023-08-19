@@ -95,13 +95,13 @@ class Controller:
         DIRECT   = 0
         POW2     = 1
 
-    def __init__(self, port=None, baudrate=115200, sinks=[]):
+    def __init__(self, port=None, baudrate=921600, sinks=[]):
         """Construct a Controller with a specified port
 
         :param port: The serial port
         :type port: str
         :param baudrate: The baudrate for the serial connection 
-            (default 115200 specified in firmware)
+            (default 921600 specified in firmware)
         :type baudrate: int
         """
         self.comm = None
@@ -112,7 +112,7 @@ class Controller:
     def set_sinks(self, sinks):
         self.sinks = sinks
 
-    def reset_com_port(self, port, baudrate=115200):
+    def reset_com_port(self, port, baudrate=921600):
         if self.comm is not None:
             self.comm.close()
         self.comm = serial.Serial()
@@ -257,8 +257,8 @@ class Controller:
                 hdr = ser.read(size=1)
                 byte_count = 0
                 if (hdr[0] & 0xC0) >> 6 == self.PacketType.DATA:
-                    byte_count = hdr[0] & 0x3F
-                    if byte_count % 2 == 0:
+                    byte_count = (1 << (hdr[0] & 0x3F))
+                    if byte_count < 2:
                         raise BadHeader("Unexpected byte count for data: {}".format(byte_count))
                     byte_count -= 1
                 elif (hdr[0] & 0xC0) >> 6 == self.PacketType.HALT:

@@ -357,7 +357,7 @@ class App(QtWidgets.QWidget):
         spectrum = SpectrumPlotSink(
             chart=self.canvas, 
             dT=clk.T_conversion(), 
-            T_window=1.0, 
+            T_window=0.2, 
             T_step=1.0,
             scaling=3.3/4095.0)
         self.canvas.update_x_lim(spectrum.get_x_lim())

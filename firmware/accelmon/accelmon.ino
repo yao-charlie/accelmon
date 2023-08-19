@@ -6,6 +6,7 @@
 // https://forum.arduino.cc/t/arduino-m0-pro-adc-free-running-with-interrupt/471688
 
 #include <Adafruit_NeoPixel.h>
+#include <RingBuf.h>
 
 #include "adc_util.h"
 #include "gclk_util.h"
@@ -47,19 +48,20 @@ struct RunConfig
 // create a pixel strand with 1 pixel on PIN_NEOPIXEL
 Adafruit_NeoPixel pixels(1, PIN_NEOPIXEL);
 
-volatile bool result_ready;
-volatile uint16_t adc_val;
+//volatile bool result_ready;
+//volatile uint16_t adc_val;
 volatile uint32_t dropped_count;
-volatile uint32_t timestamp_us;
+//volatile uint32_t timestamp_us;
+RingBuf<uint16_t, 1024> adc_val;
 
 void ADC_Handler() 
 {
   PORT->Group[PORTA].OUTTGL.reg = (1 << ADC_CONV_IOPIN); 
-  if (!result_ready) {
+  if (!adc_val.push(0x0FFF & ADC->RESULT.reg)) {
     //timestamp_us = TC4->COUNT32.COUNT.reg;
-    adc_val = 0x0FFF & ADC->RESULT.reg;     // uint16_t
-    result_ready = true;
-  } else {
+    //adc_val = 0x0FFF & ADC->RESULT.reg;     // uint16_t
+    //result_ready = true;
+  //} else {
     dropped_count++;
   }
   ADC->INTFLAG.bit.RESRDY = 1;  // write a bit to clear interrupt
@@ -67,7 +69,7 @@ void ADC_Handler()
 
 void setup() 
 {
-  Serial.begin(115200);
+  Serial.begin(921600);
   pixels.begin();
   
   delay(1000);
@@ -98,16 +100,18 @@ void setup()
 
 }
 
+
 void loop() 
 {
-  process_serial_buffer();
+  if (Serial.available() > 0) {
+    process_serial_buffer();
+  }
 
-  if (result_ready) {
-    uint16_t const sample = adc_val;
-    result_ready = false;
+  uint16_t sample;
+  while (adc_val.lockedPop(sample)) {
     if (packet.append_sample(sample)) {
       Serial.write(packet.buffer(), packet.byte_count());
-      packet.reset();    
+      packet.reset();
     }        
     if ((packet.max_packets > 0) && (packet.sample_count >= packet.max_packets)) {
       stop_ADC();
@@ -116,6 +120,24 @@ void loop()
       packet.reset();
     }
   }
+
+/*
+  if (result_ready) {
+    uint16_t const sample = adc_val;
+    result_ready = false;
+    
+    if (packet.append_sample(sample)) {
+      Serial.write(packet.buffer(), packet.byte_count());
+      packet.reset();
+    }        
+    if ((packet.max_packets > 0) && (packet.sample_count >= packet.max_packets)) {
+      stop_ADC();
+      cfg.started = false;
+      Serial.write(packet.buffer(), packet.byte_count());
+      packet.reset();
+    }
+  }
+  */
 }
 
 // Message format
@@ -166,7 +188,7 @@ void process_serial_buffer()
       packet.sample_count = 0;
       cfg.started = true;
       dropped_count = 0;
-      result_ready = false;
+      //result_ready = false;
       start_ADC();
     } else if (data_in == 'C') {
       char const cfg_opt = Serial.read();      

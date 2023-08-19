@@ -2,9 +2,9 @@
 #define packet_container_h_
 
 
-#define HDR_TYPE_DATA 0x1
-#define HDR_TYPE_RESP 0x2
-#define HDR_TYPE_HALT 0x3
+#define HDR_TYPE_DATA 0x40
+#define HDR_TYPE_RESP 0x80
+#define HDR_TYPE_HALT 0xC0
 
 #define RESP_TYPE_RSVD      0x0
 #define RESP_TYPE_ID        0x1
@@ -15,7 +15,8 @@
 #define RESP_TYPE_SAMPLE_COUNT  0x6
 #define RESP_TYPE_ADC_SAMPLEN   0x7
 
-#define MAX_PACKET_LENGTH 64
+#define M_PACKET_SIZE 8
+#define MAX_PACKET_LENGTH 256
 
 class PacketContainer 
 {
@@ -29,13 +30,13 @@ public:
 
   int8_t write_resp(uint8_t resp_type, uint32_t val)
   {
-    buf[0] = (HDR_TYPE_RESP << 6) | (resp_type << 3);
+    buf[0] = HDR_TYPE_RESP | (resp_type << 3);
     write_to_buf(val, &buf[1]);
     return 5;
   }
   int8_t write_halt() 
   {
-    buf[0] = HDR_TYPE_HALT << 6;
+    buf[0] = HDR_TYPE_HALT;
     write_to_buf(sample_count, &buf[1]);
     return 5;
   }
@@ -45,7 +46,7 @@ public:
     sample_count++;
     pos += 2;   // sizeof(uint16_t)
     if (pos >= (MAX_PACKET_LENGTH-2)) { 
-      buf[0] = (HDR_TYPE_DATA << 6) | pos;
+      buf[0] = HDR_TYPE_DATA | M_PACKET_SIZE;
       return true;
     }
     return false;

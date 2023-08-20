@@ -5,6 +5,31 @@ import numpy as np
 from scipy.signal import get_window
 import threading
 import time
+import struct
+
+class RawValueConverter:
+    """The abstract base class to convert raw values from an ADC to physically
+    meaningful numbers for analysis"""
+    def conv(self, v):
+        pass
+
+class NoConversionConverter (RawValueConverter):
+    """Do nothing"""
+    def conv(self, v):
+        return v
+
+
+class SignedInt16Converter (RawValueConverter):
+    """Interpret raw values as signed int 16 and scale to float"""
+
+    def __init__(self, scaling=1.):
+        self.a = scaling
+
+    def conv(self, v):
+        b = int(v).to_bytes(2,'little')
+        c = struct.unpack('<h',b)[0]
+        return self.a * c
+
 
 class SampleSink:
     """The abstract base class for sinks to record streaming sample data"""
@@ -30,11 +55,12 @@ class SampleSink:
 class CsvSampleSink (SampleSink):
     """Write sample data to a text file in comma separated value (CSV) format"""
 
-    def __init__(self, filename, width=1):
+    def __init__(self, filename, width=1, converter=NoConversionConverter):
         self.filename = filename
         self.hf = None
         self.width = width
         self.n_samples = 0
+        self.converter = converter
 
     def open(self): 
         self.close()
@@ -48,7 +74,8 @@ class CsvSampleSink (SampleSink):
 
     def write(self, sample):
         for s in sample:
-            self.hf.write(f"{s}")
+            v = self.converter.conv(s)
+            self.hf.write(f"{v}")
             self.n_samples += 1
             if self.n_samples % self.width == 0:
                 self.hf.write("\n")

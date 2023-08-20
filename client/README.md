@@ -23,5 +23,6 @@ the board is connected on the serial port `/dev/ttyACM0`.
 ```python
 import board
 mon = board.Controller('/dev/ttyACM0')
-print("Board ID: {}".format(mon.board_id()))
+b_id, accel_type = mon.board_id()
+print(f"Board ID: {b_id}, Accelerometer: {accel_type}")
 ```

@@ -6,7 +6,7 @@ import threading
 import time
 import argparse
 import board
-from sinks import CsvSampleSink
+from sinks import CsvSampleSink, SignedInt16Converter, NoConversionConverter
 
 if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
@@ -25,15 +25,24 @@ if __name__ == "__main__":
     logging.info("Starting demo")
     logging.info(args)
     
-    mon = board.Controller(port=args.port, sinks=[csv])
-    b_id, accel_type = mon.board_id()
+    peek = board.Controller(port=args.port)
+    b_id, accel_type = peek.board_id()
     logging.info(f"Board ID: {b_id}, Accelerometer: {accel_type}")
+    
     
     values_per_conversion = 3 if accel_type == "KX134" else 1
 
+    converter=NoConversionConverter()
+    if accel_type == "KX134":
+        gsel = peek.accel_g_range
+        gscaling = 1./(2**(15 - (3 + gsel)))
+        converter = SignedInt16Converter(scaling=gscaling) 
+
     logging.info("Creating sink {}".format(args.filename))
-    csv = CsvSampleSink(args.filename, width=values_per_conversion)
+    csv = CsvSampleSink(args.filename, width=values_per_conversion, converter=converter)
     csv.open()
+    
+    mon = board.Controller(port=args.port, sinks=[csv])
 
     logging.info("Main: creating thread")
     x = threading.Thread(target=mon.collect_samples, args=(args.max_count,))

@@ -1,8 +1,7 @@
 #ifndef packet_container_h_
 #define packet_container_h_
 
-
-#define HDR_TYPE_DATA 0x40
+#define HDR_TYPE_DATA 0x40      // MSB is zero
 #define HDR_TYPE_RESP 0x80
 #define HDR_TYPE_HALT 0xC0
 
@@ -10,15 +9,13 @@
 #define RESP_TYPE_ID            0x1
 #define RESP_TYPE_SAMPLE_COUNT  0x2
 
-
-#define M_PACKET_SIZE 8
-#define MAX_PACKET_LENGTH 256
+#define MAX_PACKET_LENGTH_BYTES 242   // 2-byte header + 120 words   
 
 class PacketContainer 
 {
 public:
   
- PacketContainer() : max_packets(0), sample_count(0), pos(1) {}
+  PacketContainer() : max_packets(0), sample_count(0), pos(1) {}
 
   uint32_t max_packets;
   uint32_t sample_count;
@@ -26,7 +23,7 @@ public:
 
   int8_t write_resp(uint8_t resp_type, uint32_t val)
   {
-    buf[0] = HDR_TYPE_RESP | (resp_type << 3);
+    buf[0] = HDR_TYPE_RESP | resp_type;
     write_to_buf(val, &buf[1]);
     return 5;
   }
@@ -36,24 +33,24 @@ public:
     write_to_buf(sample_count, &buf[1]);
     return 5;
   }
+
   bool append_sample(uint16_t data) 
   {
-    write_to_buf(data, &buf[pos]);
-    sample_count++;
-    pos += 2;   // sizeof(uint16_t)
-    if (pos >= (MAX_PACKET_LENGTH-2)) { 
-      buf[0] = HDR_TYPE_DATA | M_PACKET_SIZE;
-      return true;
+    write_to_buf(data, &buf[2*pos++]);
+    sample_count++;   // accumulate total samples recorded over run
+    if (pos < (MAX_PACKET_LENGTH_BYTES >> 1)) {
+      return false;
     }
-    return false;
+    uint16_t const hdr_word = (HDR_TYPE_DATA << 8) | (0x3FFF & (pos-1));  // -1 for header
+    write_to_buf(hdr_word, &buf[0]);
+    return true;
   }
-
-  uint8_t byte_count() const { return pos; }
+  uint8_t byte_count() const { return 2*pos; }
   void reset() { pos = 1; }
 
 private:
-  uint8_t pos;
-  uint8_t buf[MAX_PACKET_LENGTH];
+  uint16_t pos;   // buffer position in words (16-bit)
+  uint8_t buf[MAX_PACKET_LENGTH_BYTES];
 
   template<typename T>
   void write_to_buf(T v, uint8_t* start) 
@@ -63,8 +60,6 @@ private:
       *start++ = bvals[sizeof(T)-1-i];   // MSB first
     }
   }
-
-  
 };
 
 static PacketContainer packet;

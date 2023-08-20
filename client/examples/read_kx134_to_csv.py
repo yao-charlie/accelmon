@@ -29,7 +29,6 @@ if __name__ == "__main__":
     b_id, accel_type = peek.board_id()
     logging.info(f"Board ID: {b_id}, Accelerometer: {accel_type}")
     
-    
     values_per_conversion = 3 if accel_type == "KX134" else 1
 
     converter=NoConversionConverter()
@@ -69,6 +68,10 @@ if __name__ == "__main__":
     csv.close()
     logging.info("Main: done")
 
+    n_samples = mon.sample_count() 
+    n_dropped = mon.dropped_count()
+
+    print(f"Collected {n_samples} samples with {n_dropped} dropped")
 
 
 

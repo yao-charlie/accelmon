@@ -181,6 +181,14 @@ class Controller:
         """
         return self._ask_resp('C',self.ResponseType.SAMPLE_COUNT)
     
+    def dropped_count(self):
+        """Request the dropped count from the last run
+
+        :returns: the dropped_count result
+        """
+        # uses the same response type as sample count
+        return self._ask_resp('X',self.ResponseType.SAMPLE_COUNT)
+
     # 
     # ADXL1005
     #
@@ -338,19 +346,19 @@ class Controller:
                     or (max_samples > 0 and sample_count >= max_samples)):
 
                 hdr = ser.read(size=1)
-                byte_count = 0
+                word_count = 0
                 if (hdr[0] & 0xC0) >> 6 == self.PacketType.DATA:
-                    byte_count = (1 << (hdr[0] & 0x3F))
-                    if byte_count < 2:
-                        raise BadHeader("Unexpected byte count for data: {}".format(byte_count))
-                    byte_count -= 1
+                    hdr_lb = ser.read(size=1)   # lower byte
+                    word_count = struct.unpack('>H',hdr + hdr_lb)[0] & 0x3FFF
+                    if word_count < 1:
+                        raise BadHeader("Unexpected count for data: {}".format(word_count))
                 elif (hdr[0] & 0xC0) >> 6 == self.PacketType.HALT:
                     sample_count = struct.unpack('>I',ser.read(size=4))[0]
                     break
                 else:
                     raise BadHeader("Unexpected header type (data): 0x{:x}".format(hdr[0]))
                 
-                raw_data = [struct.unpack('>H',ser.read(size=2))[0] for i in range(byte_count // 2)]
+                raw_data = [struct.unpack('>H',ser.read(size=2))[0] for i in range(word_count)]
                 sample_count += len(raw_data)
 
                 for sink in self.sinks:
@@ -373,15 +381,14 @@ class Controller:
         with self.comm as ser:
             ser.write(bytes("A{}\n".format(lbl),'utf-8'))  
             hdr = ser.read(size=1)
-            err_bit = self._validate_resp_hdr(hdr, resp_type)
+            ok = self._validate_resp_hdr(hdr, resp_type)
             buf = ser.read(size=4)
-            if err_bit is None:
+            if ok is None:
                 return None
-            elif err_bit:   
-                raise BadHeader("Unexpected error bit")
-            else:
+            elif ok:
                 return struct.unpack('>I',buf)[0]
-
+            raise BadHeader("Unexpected error")
+                
     def _validate_resp_hdr(self, hdr, resp_type):
         """[Internal] Validate the header byte for a response packet
 
@@ -390,16 +397,16 @@ class Controller:
         :param resp_type: The response type code from :py:class:`ResponseType`
         :type resp_type: :py:class:`ResponseType` value
         :raises BadHeader: If the header contains an unexpected pattern
-        :returns: an error flag, True if the error bit is set in the header
+        :returns: True on success
         """
         if (hdr[0] & 0xC0) >> 6 != self.PacketType.RESP:
             raise BadHeader("Unexpected header type: 0x{:x}".format(hdr[0]))
-        received_resp_type = (hdr[0] & 0x38) >> 3
+        received_resp_type = (hdr[0] & 0x3F)
         if received_resp_type == self.ResponseType.NONE:
             return None
         if received_resp_type != resp_type:
             raise BadHeader("Unexpected response type: 0x{:x}".format(hdr[0]))
-        return (hdr[0] & 0x01) != 0
+        return True
     
     def _validate_cfg_param(self, data, lbl, range):
         if lbl not in data:

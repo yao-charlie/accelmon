@@ -7,15 +7,20 @@
 
 #define BOARD_ID_MASK 0x00FFFFFF
 
+bool is_running;
 volatile bool data_ready;
 volatile uint32_t dropped_count;
-RingBuf<uint16_t, 1024> adc_val;
+volatile uint32_t timestamp;
+RingBuf<uint16_t, 512> adc_val;
 
 uint32_t serial_read_uint32();
 void process_serial_buffer();
+void halt_and_blink_until_reset(int8_t r, int8_t g, int8_t b);
+void reset_for_data_collection();
 
 void ADC_Handler() 
 {
+  timestamp = micros();
   PORT->Group[PORTA].OUTTGL.reg = (1 << ADXL1005_ADC_CONV_IOPIN); 
   if (!adc_val.push(0x0FFF & ADC->RESULT.reg)) {
     dropped_count++;
@@ -26,6 +31,7 @@ void ADC_Handler()
 // uses the Arduino implementation for the EIC, which handles clearing the flag (see WInterrupts.c)
 void data_ready_ISR()
 {
+  timestamp = micros();
   if (data_ready) { // not cleared
     dropped_count++;
   }
@@ -41,7 +47,7 @@ KX134 accel(data_ready_ISR, KX134_DRDY_IOPIN);
 
 FlashStorage(board_id_store, uint32_t);
 uint32_t board_id;
-bool is_running;
+
 
 void setup() 
 {
@@ -80,14 +86,18 @@ void loop()
 
   // for digitial read (I2C or SPI) from KX134 
   // could probably write direct to packet here
-  if (data_ready) {
+  if (is_running && data_ready) {
     auto const data = accel.process();
-    for (int16_t i = 0; i < data.count; ++i) {
-      if (!adc_val.push(data.buf[i])) {
-        dropped_count++;
-      }
-    }
     data_ready = false;
+    //if (adc_val.push(timestamp)) {
+      for (int16_t i = 0; i < data.count; ++i) {
+        if (!adc_val.push(data.buf[i])) {
+          dropped_count++;
+        }
+      }
+    //} else {
+    //  dropped_count += data.count;
+    //}
   }
 
   uint16_t sample;
@@ -97,12 +107,49 @@ void loop()
       packet.reset();
     }        
     if ((packet.max_packets > 0) && (packet.sample_count >= packet.max_packets)) {
-      accel.stop();
       is_running = false;
+      accel.stop();
       Serial.write(packet.buffer(), packet.byte_count());
-      packet.reset();
     }
   }
+}
+
+void halt_and_blink_until_reset(int8_t r, int8_t g, int8_t b)
+{
+  accel.stop(); // disable interrupts
+  while (1) {
+    pixels.setPixelColor(0, pixels.Color(r, g, b));
+    pixels.show();
+    delay(500);
+    if (Serial.available() > 0) {
+      char const data_in = Serial.read();
+      if (data_in == 'Z') {
+        break;
+      }
+    }
+
+    pixels.clear();
+    pixels.show();
+    delay(500);
+    if (Serial.available() > 0) {
+      char const data_in = Serial.read();
+      if (data_in == 'Z') {
+        break;
+      }
+    }
+  }
+
+  NVIC_SystemReset();
+
+}
+
+void reset_for_data_collection()
+{
+  dropped_count = 0;
+  data_ready = false;
+  packet.reset();
+  packet.sample_count = 0;
+  adc_val.clear();
 }
 
 int serial_read_uint32(uint32_t& val)
@@ -131,6 +178,7 @@ int serial_read_uint32(uint32_t& val)
 //  general
 //  B : Accelerometer type [24:31] | board ID [0:23]
 //  C : sample count
+//  X : dropped count
 //  KX134
 //  F : output data rate (4-bit code)
 //  G : g range selection 0=8g, 1=16g, 2=32g, 3=64g
@@ -147,9 +195,9 @@ void process_serial_buffer()
   if (data_in == 'Z') {
     NVIC_SystemReset();
   } else if ((data_in == 'H') && (is_running)) {
-      accel.stop();
       is_running = false;
-
+      accel.stop();
+      
       if (dropped_count == 0) {
         pixels.clear();
       } else {
@@ -168,10 +216,9 @@ void process_serial_buffer()
 
       pixels.setPixelColor(0, pixels.Color(0, 0, 96));
       pixels.show();
-     
-      packet.sample_count = 0;
+
+      reset_for_data_collection();
       is_running = true;
-      dropped_count = 0;
       accel.start();
     } else if (data_in == 'C') {
       char const cfg_key = Serial.read(); 
@@ -191,6 +238,8 @@ void process_serial_buffer()
         count = packet.write_resp(RESP_TYPE_SAMPLE_COUNT, packet.sample_count);                          
       } else if (ask_opt == 'B') {
         count = packet.write_resp(RESP_TYPE_ID, board_id | (accel.type_id() << 24));
+      } else if (ask_opt == 'X') {
+        count = packet.write_resp(RESP_TYPE_SAMPLE_COUNT, dropped_count);
       } else {
         auto const resp = accel.get(ask_opt);
         count = packet.write_resp(resp.type, resp.val); // can be none on fall through

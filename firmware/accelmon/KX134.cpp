@@ -41,16 +41,17 @@ bool KX134::init()
 void KX134::start()
 {
 
+  accel_.clearInterrupt();    
   attachInterrupt(drdy_int_pin_, callback_, RISING);
-
+  
   // CTL1 register
   uint8_t const PC1_EN = (1 << 7);
   uint8_t const RES_HI_PERFORMANCE = (1 << 6);
   uint8_t const DRDY_EN = (1 << 5);
   uint8_t const GSEL_RANGE = (cfg_.g_range << 3);
   accel_.writeRegisterByte(SFE_KX13X_CNTL1, (PC1_EN | RES_HI_PERFORMANCE | DRDY_EN | GSEL_RANGE));
-  
-  delay(20);  // wait 1.5/ODR = 15ms after CTL1.PC1 0->1
+    
+  //delay(20);  // wait 1.5/ODR = 15ms after CTL1.PC1 0->1
 }
 
 void KX134::stop()

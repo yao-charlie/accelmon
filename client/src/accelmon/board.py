@@ -84,18 +84,24 @@ class Controller:
     class ResponseType:
         """The type of response in RESP packet stored in bits 3-5 of the header byte"""
         # general
-        NONE     = 0b000
-        ID       = 0b001
-        SAMPLE_COUNT = 0b0010
+        NONE          = 0x00
+        ID            = 0x01
+        SAMPLE_COUNT  = 0x02
+        DROPPED_COUNT = 0X03
+        T_MEAN        = 0x04
+        T_VARIANCE    = 0x05
+        T_MAX         = 0x06
+        T_MIN         = 0x07
+        T_N           = 0x08
         # ADXL1005 specific
-        ADXL_FCLK     = 0b011
-        ADXL_DIV      = 0b100
-        ADXL_DIV_MODE = 0b101
-        ADXL_ADC_PRE  = 0b110
-        ADXL_ADC_SAMPLEN = 0b111
+        ADXL_FCLK        = 0x13
+        ADXL_DIV         = 0x14
+        ADXL_DIV_MODE    = 0x15
+        ADXL_ADC_PRE     = 0x16
+        ADXL_ADC_SAMPLEN = 0x17
         # KX134 specific
-        KX134_ODR   = 0b0011
-        KX134_GSEL  = 0b0100 
+        KX134_ODR   = 0x18
+        KX134_GSEL  = 0x19 
 
     class GClkDividerMode:
         """Mode select for the GCLK divider"""
@@ -186,8 +192,28 @@ class Controller:
 
         :returns: the dropped_count result
         """
-        # uses the same response type as sample count
-        return self._ask_resp('X',self.ResponseType.SAMPLE_COUNT)
+        return self._ask_resp('X',self.ResponseType.DROPPED_COUNT)
+    
+    def T_mean(self):
+        """Request the mean sample period (us)
+
+        :returns: the mean sample period (us)
+        """
+        return self._ask_resp('U',self.ResponseType.T_MEAN,data_format='>f')
+    
+    def T_variance(self):
+        """Request the sample period variance (us)
+
+        :returns: the sample period variance (us)
+        """
+        return self._ask_resp('V',self.ResponseType.T_VARIANCE,data_format='>f')
+
+    def T_max(self):
+        return self._ask_resp('R',self.ResponseType.T_MAX)
+    def T_min(self):
+        return self._ask_resp('S',self.ResponseType.T_MIN)
+    def T_N(self):
+        return self._ask_resp('N',self.ResponseType.T_N)
 
     # 
     # ADXL1005
@@ -370,7 +396,7 @@ class Controller:
 
         return sample_count
 
-    def _ask_resp(self,lbl,resp_type):
+    def _ask_resp(self,lbl,resp_type,data_format='>I'):
         """[Internal] Send a packet asking for a response (FCLK, DIV, etc.)
 
         :param lbl: The response type label ('F'CLK, 'D'IV, DIV_'M'ODE)
@@ -386,7 +412,7 @@ class Controller:
             if ok is None:
                 return None
             elif ok:
-                return struct.unpack('>I',buf)[0]
+                return struct.unpack(data_format,buf)[0]
             raise BadHeader("Unexpected error")
                 
     def _validate_resp_hdr(self, hdr, resp_type):

@@ -6,7 +6,8 @@ import threading
 import time
 import argparse
 import board
-from sinks import CsvSampleSink, SignedInt16Converter, NoConversionConverter
+import math
+from sinks import CsvSampleSink, IntervalSignedInt16Converter, NoConversionConverter
 
 if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
@@ -29,13 +30,13 @@ if __name__ == "__main__":
     b_id, accel_type = peek.board_id()
     logging.info(f"Board ID: {b_id}, Accelerometer: {accel_type}")
     
-    values_per_conversion = 3 if accel_type == "KX134" else 1
+    values_per_conversion = 4 if accel_type == "KX134" else 1
 
     converter=NoConversionConverter()
     if accel_type == "KX134":
         gsel = peek.accel_g_range
         gscaling = 1./(2**(15 - (3 + gsel)))
-        converter = SignedInt16Converter(scaling=gscaling) 
+        converter = IntervalSignedInt16Converter(scaling=gscaling) 
 
     logging.info("Creating sink {}".format(args.filename))
     csv = CsvSampleSink(args.filename, width=values_per_conversion, converter=converter)
@@ -73,6 +74,13 @@ if __name__ == "__main__":
 
     print(f"Collected {n_samples} samples with {n_dropped} dropped")
 
+    T_n = mon.T_N()
+    T_mean_us = mon.T_mean()
+    T_stddev_us = math.sqrt(mon.T_variance())
+    T_max_us = mon.T_max()
+    T_min_us = mon.T_min()
 
-
+    print(f"Timing T_avg={T_mean_us:.3g}us, std. dev {T_stddev_us:.3g} us")
+    print(f"T_max={T_max_us:.3g}us, T_min={T_min_us:.3g}us, n={T_n}")
+    
 

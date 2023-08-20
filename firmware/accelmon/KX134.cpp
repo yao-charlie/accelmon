@@ -1,8 +1,8 @@
 #include "KX134.h"
 
-// config response types (0x00-0x02 reserved)
-#define RESP_TYPE_ODR   0x03
-#define RESP_TYPE_GSEL  0x04
+// config response types (0x00-0x0F reserved)
+#define RESP_TYPE_ODR   0x18
+#define RESP_TYPE_GSEL  0x19
 
 KX134::KX134(VoidFunc_T callback, int int_pin /* = 6*/) 
   : callback_(callback), drdy_int_pin_(int_pin) 

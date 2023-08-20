@@ -7,11 +7,57 @@
 
 #define BOARD_ID_MASK 0x00FFFFFF
 
-bool is_running;
 volatile bool data_ready;
 volatile uint32_t dropped_count;
-volatile uint32_t timestamp;
+volatile uint32_t timestamp_curr;
+volatile uint32_t timestamp_prev;
+
 RingBuf<uint16_t, 512> adc_val;
+
+bool is_running;
+
+typedef struct {
+  int16_t  skip_count;
+  uint32_t n;    // count
+  float    mu;   // mean
+  float    M2;   // sum of squares diff from mean 
+  uint32_t max_T;
+  uint32_t min_T;
+  void update(uint32_t new_interval_n)
+  {
+    float const new_interval = (float)new_interval_n;
+
+    // Welfords algorithm https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+    if (skip_count == 0) {
+      n++;
+      float const delta = new_interval - mu;
+      mu += delta / (float)n;
+      M2 += delta * (new_interval - mu );  // use updated mu for "delta2"
+      if (new_interval_n > max_T) {
+        max_T = new_interval_n;
+      } else if (new_interval_n < min_T) {
+        min_T = new_interval_n;
+      }
+    } else {
+      skip_count--;
+      if (skip_count == 0) {
+        mu = new_interval;
+        n = 1;
+      }
+    }
+  }
+  void reset(int16_t const skips=2) 
+  {
+    skip_count = skips;
+    max_T = 0.0;
+    min_T = 1e38;
+    M2 = 0.0;
+    mu = 0.0;
+    n = 0;
+  }
+} timing_statistics_t;
+timing_statistics_t timing_stats;
+
 
 uint32_t serial_read_uint32();
 void process_serial_buffer();
@@ -20,7 +66,7 @@ void reset_for_data_collection();
 
 void ADC_Handler() 
 {
-  timestamp = micros();
+  timestamp_curr = micros();
   PORT->Group[PORTA].OUTTGL.reg = (1 << ADXL1005_ADC_CONV_IOPIN); 
   if (!adc_val.push(0x0FFF & ADC->RESULT.reg)) {
     dropped_count++;
@@ -31,7 +77,9 @@ void ADC_Handler()
 // uses the Arduino implementation for the EIC, which handles clearing the flag (see WInterrupts.c)
 void data_ready_ISR()
 {
-  timestamp = micros();
+  timestamp_prev = timestamp_curr;
+  timestamp_curr = micros();
+  
   if (data_ready) { // not cleared
     dropped_count++;
   }
@@ -88,16 +136,26 @@ void loop()
   // could probably write direct to packet here
   if (is_running && data_ready) {
     auto const data = accel.process();
+    uint32_t const interval_us = timestamp_curr > timestamp_prev ? 
+        timestamp_curr - timestamp_prev : (0xFFFFFFFF - timestamp_prev) + timestamp_curr;
     data_ready = false;
-    //if (adc_val.push(timestamp)) {
+
+    // assume that the minimum sample rate is > 16Hz (<65535us period)
+    if (interval_us > 0xFFFFFFFF) {
+      halt_and_blink_until_reset(64,0,0);
+    }
+
+    if (adc_val.push((uint16_t)interval_us)) {
       for (int16_t i = 0; i < data.count; ++i) {
         if (!adc_val.push(data.buf[i])) {
           dropped_count++;
         }
       }
-    //} else {
-    //  dropped_count += data.count;
-    //}
+    } else {
+      dropped_count += data.count;
+    }
+
+    timing_stats.update(interval_us);
   }
 
   uint16_t sample;
@@ -149,6 +207,7 @@ void reset_for_data_collection()
   data_ready = false;
   packet.reset();
   packet.sample_count = 0;
+  timing_stats.reset(2);
   adc_val.clear();
 }
 
@@ -179,6 +238,11 @@ int serial_read_uint32(uint32_t& val)
 //  B : Accelerometer type [24:31] | board ID [0:23]
 //  C : sample count
 //  X : dropped count
+//  U : mean sample time
+//  V : sample time variance
+//  R : max T
+//  S : min T
+//  N : n for mean 
 //  KX134
 //  F : output data rate (4-bit code)
 //  G : g range selection 0=8g, 1=16g, 2=32g, 3=64g
@@ -189,6 +253,7 @@ int serial_read_uint32(uint32_t& val)
 //  P : ADC prescaler setting
 //  L : ADC sample length
 // Z : reset the board
+// ask/resp: A---E--HIJK--NO-QRST--W-YZ
 void process_serial_buffer()
 {
   char const data_in = Serial.read();
@@ -220,6 +285,7 @@ void process_serial_buffer()
       reset_for_data_collection();
       is_running = true;
       accel.start();
+      timestamp_prev = micros();    // rough starting point
     } else if (data_in == 'C') {
       char const cfg_key = Serial.read(); 
       uint32_t cfg_val = 0;
@@ -239,7 +305,18 @@ void process_serial_buffer()
       } else if (ask_opt == 'B') {
         count = packet.write_resp(RESP_TYPE_ID, board_id | (accel.type_id() << 24));
       } else if (ask_opt == 'X') {
-        count = packet.write_resp(RESP_TYPE_SAMPLE_COUNT, dropped_count);
+        count = packet.write_resp(RESP_TYPE_DROPPED_COUNT, dropped_count);
+      } else if (ask_opt == 'U') {
+        count = packet.write_resp(RESP_TYPE_T_MEAN, timing_stats.mu);
+      } else if (ask_opt == 'V') {
+        float const unbiased_sample_variance = timing_stats.M2 / (float)(timing_stats.n - 1);
+        count = packet.write_resp(RESP_TYPE_T_VARIANCE, unbiased_sample_variance);
+      }  else if (ask_opt == 'R') {
+        count = packet.write_resp(RESP_TYPE_T_MAX, timing_stats.max_T);
+      } else if (ask_opt == 'S') {
+        count = packet.write_resp(RESP_TYPE_T_MIN, timing_stats.min_T);
+      } else if (ask_opt == 'N') {
+        count = packet.write_resp(RESP_TYPE_T_N, timing_stats.n);
       } else {
         auto const resp = accel.get(ask_opt);
         count = packet.write_resp(resp.type, resp.val); // can be none on fall through

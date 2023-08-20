@@ -10,22 +10,25 @@ import struct
 class RawValueConverter:
     """The abstract base class to convert raw values from an ADC to physically
     meaningful numbers for analysis"""
-    def conv(self, v):
+    def conv(self, v, i):
         pass
 
 class NoConversionConverter (RawValueConverter):
     """Do nothing"""
-    def conv(self, v):
+    def conv(self, v, i):
         return v
 
 
-class SignedInt16Converter (RawValueConverter):
+class IntervalSignedInt16Converter (RawValueConverter):
     """Interpret raw values as signed int 16 and scale to float"""
 
-    def __init__(self, scaling=1.):
+    def __init__(self, cols=4, scaling=1.):
+        self.cols = cols
         self.a = scaling
 
-    def conv(self, v):
+    def conv(self, v, i):
+        if i % self.cols == 0:  # first entry in row is interval (us) as uint16_t
+            return v
         b = int(v).to_bytes(2,'little')
         c = struct.unpack('<h',b)[0]
         return self.a * c
@@ -74,7 +77,7 @@ class CsvSampleSink (SampleSink):
 
     def write(self, sample):
         for s in sample:
-            v = self.converter.conv(s)
+            v = self.converter.conv(s,self.n_samples)
             self.hf.write(f"{v}")
             self.n_samples += 1
             if self.n_samples % self.width == 0:

@@ -4,11 +4,11 @@
 #include "adc_util.h"
 
 // config response types
-#define RESP_TYPE_FCLK          0x3
-#define RESP_TYPE_DIV           0x4
-#define RESP_TYPE_DIV_MODE      0x5
-#define RESP_TYPE_ADC_PRE       0x6
-#define RESP_TYPE_ADC_SAMPLEN   0x7
+#define RESP_TYPE_FCLK          0x13
+#define RESP_TYPE_DIV           0x14
+#define RESP_TYPE_DIV_MODE      0x15
+#define RESP_TYPE_ADC_PRE       0x16
+#define RESP_TYPE_ADC_SAMPLEN   0x17
 
 bool ADXL1005::init()
 {

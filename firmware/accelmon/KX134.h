@@ -6,8 +6,6 @@
 #include <Wire.h>
 #include <SparkFun_KX13X.h> 
 
-#define KX134_DRDY_IOPIN    6          // D6/A6/TX
-
 
 class KX134 : public AccelerometerBase {
 public:
@@ -20,8 +18,14 @@ public:
 
   struct Config
   {
-    Config() : odata_rate(0x07) /* 100Hz */ { }
+    Config() : 
+      odata_rate(0x07), /* 100Hz */
+      g_range(0x01)     /* 16g */
+    { 
+
+    }
     uint8_t odata_rate;   // only lower four bits are used
+    uint8_t g_range;      // lower 2 bits, 0=8g to 3=64g
   };
 
   uint8_t type_id() const override { return TYPE_ID_KX134; }

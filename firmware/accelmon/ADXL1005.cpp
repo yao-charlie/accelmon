@@ -3,8 +3,6 @@
 #include "port_util.h"
 #include "adc_util.h"
 
-
-
 // config response types
 #define RESP_TYPE_FCLK          0x3
 #define RESP_TYPE_DIV           0x4
@@ -14,21 +12,23 @@
 
 bool ADXL1005::init()
 {
-  init_pin_for_D_out(ADXL1005_ADC_CONV_IOPIN);
-  init_pin_for_D_out(ADXL1005_STBY_IOPIN);
-  init_pin_for_D_out(ADXL1005_SELF_TEST_IOPIN);
-  init_pin_for_D_in(ADXL1005_OR_IOPIN);
-  
-  //Serial.println("Hello accelo");
+  // currently these are unused or debug only
+  init_pin_for_D_out(ADXL1005_ADC_CONV_IOPIN);    // toggles on conversion complete (ADC interrupt)
+  init_pin_for_D_out(ADXL1005_STBY_IOPIN);        // not used, config is TODO
+  init_pin_for_D_out(ADXL1005_SELF_TEST_IOPIN);   // not used, config is TODO
+  init_pin_for_D_in(ADXL1005_OR_IOPIN);           // not used
 
-  init_pin_for_CLK_out();
-  cfg_.fclk = init_GCLK(5, cfg_.clk_div, cfg_.clk_divsel, true);  
+#ifdef DEBUG_ADC_CLK
+  // hardcoded to PA11 (SCK), conflicts with SPI interface
+  init_pin_for_CLK_out(); 
+  cfg_.fclk = init_GCLK(5, cfg_.clk_div, cfg_.clk_divsel, true);
+#else  
+  cfg_.fclk = init_GCLK(5, cfg_.clk_div, cfg_.clk_divsel);  
+#endif
 
-  init_pin_for_ADC_in();
+  init_pin_for_ADC_in();    // hardcoded to A0/PA02
   init_ADC(GCLK_CLKCTRL_GEN_GCLK5);
 
-  //Serial.print("fclk = ");
-  //Serial.println(cfg_.fclk);
   return true;
 }
 

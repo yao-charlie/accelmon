@@ -1,7 +1,8 @@
 #include "KX134.h"
 
 // config response types (0x00-0x02 reserved)
-#define RESP_TYPE_ODR 0x03
+#define RESP_TYPE_ODR   0x03
+#define RESP_TYPE_GSEL  0x04
 
 KX134::KX134(VoidFunc_T callback, int int_pin /* = 6*/) 
   : callback_(callback), drdy_int_pin_(int_pin) 
@@ -12,6 +13,9 @@ KX134::KX134(VoidFunc_T callback, int int_pin /* = 6*/)
 
 bool KX134::init()
 {
+  Wire.begin();
+  delay(50);
+
   if (!accel_.begin()) {
     return false;
   }
@@ -43,8 +47,8 @@ void KX134::start()
   uint8_t const PC1_EN = (1 << 7);
   uint8_t const RES_HI_PERFORMANCE = (1 << 6);
   uint8_t const DRDY_EN = (1 << 5);
-  uint8_t const GSEL_RANGE_16G = (SFE_KX134_RANGE16G << 3);
-  accel_.writeRegisterByte(SFE_KX13X_CNTL1, (PC1_EN | RES_HI_PERFORMANCE | DRDY_EN | GSEL_RANGE_16G));
+  uint8_t const GSEL_RANGE = (cfg_.g_range << 3);
+  accel_.writeRegisterByte(SFE_KX13X_CNTL1, (PC1_EN | RES_HI_PERFORMANCE | DRDY_EN | GSEL_RANGE));
   
   delay(20);  // wait 1.5/ODR = 15ms after CTL1.PC1 0->1
 }
@@ -75,7 +79,14 @@ void KX134::set(char const key, uint32_t const val)
       stop();
       accel_.setOutputDataRate(cfg_.odata_rate); 
     }
-  } 
+  } else if (key == 'G') {
+    uint8_t const fval = val & 0x03;    // choices are 0=8g, 1=16g, 2=32g, 3=64g
+    if (fval != cfg_.g_range) {        
+      cfg_.g_range = fval;
+      stop();
+      // write on start
+    }
+  }
 }
 
 KX134::QueryResponse KX134::get(char const key) const
@@ -85,6 +96,9 @@ KX134::QueryResponse KX134::get(char const key) const
   if (key == 'F') {
     r.type = RESP_TYPE_ODR;
     r.val = cfg_.odata_rate;
+  } else if (key == 'G') {
+    r.type = RESP_TYPE_GSEL;
+    r.val = cfg_.g_range;
   } 
   return r;
 }

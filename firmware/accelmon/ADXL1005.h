@@ -3,12 +3,6 @@
 #include "accelerometerbase.h"
 #include "gclk_util.h"
 
-// IO Pins from SAMD
-#define ADXL1005_SELF_TEST_IOPIN 16  // D4/SDA
-#define ADXL1005_STBY_IOPIN 17       // D5/SCL
-#define ADXL1005_OR_IOPIN 6          // D6/A6/TX
-#define ADXL1005_ADC_CONV_IOPIN 7    // D7/A7/RX
-
 // testing the free-running ADC on the Trinket M0
 // https://forcetronic.blogspot.com/2016/10/utilizing-advanced-adc-capabilities-on.html
 // https://community.atmel.com/forum/samd21-adc-interrupt-routine

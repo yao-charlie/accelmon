@@ -6,7 +6,7 @@
 #define HDR_TYPE_RESP 0x80
 #define HDR_TYPE_HALT 0xC0
 
-#define RESP_TYPE_RSVD          0x0
+#define RESP_TYPE_NONE          0x0
 #define RESP_TYPE_ID            0x1
 #define RESP_TYPE_SAMPLE_COUNT  0x2
 

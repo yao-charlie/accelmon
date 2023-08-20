@@ -30,9 +30,10 @@ class SampleSink:
 class CsvSampleSink (SampleSink):
     """Write sample data to a text file in comma separated value (CSV) format"""
 
-    def __init__(self, filename):
+    def __init__(self, filename, width=1):
         self.filename = filename
         self.hf = None
+        self.width = width
         self.n_samples = 0
 
     def open(self): 
@@ -47,8 +48,12 @@ class CsvSampleSink (SampleSink):
 
     def write(self, sample):
         for s in sample:
-            self.hf.write("{}\n".format(s))
-        self.n_samples += len(sample)
+            self.hf.write(f"{s}")
+            self.n_samples += 1
+            if self.n_samples % self.width == 0:
+                self.hf.write("\n")
+            else:
+                self.hf.write(",")
 
     def sample_count(self):
         return self.n_samples
@@ -68,27 +73,30 @@ class ListSampleSink (SampleSink):
 class NpArraySampleSink(SampleSink):
     """Write sample data to a Numpy Array"""
 
-    def __init__(self, T, scaling=1):
+    def __init__(self, T, scaling=1, width=1):
         self.timestamp = datetime.now()
         self.delta_ns = round(T*1e9)
         self.resize_count = 0
         self.resize_stride = int(1.0/T)
         self.n_resizes = 1
 
-        self.signal = np.zeros((self.resize_stride,), dtype=np.float32)
+        self.signal = np.zeros((self.resize_stride, width), dtype=np.float32)
         self.ndx = 0
         self.scaling = scaling
         self.raw_T = T
 
     def write(self, sample):
+        width = self.signal.shape[1]
         if len(sample)+self.resize_count >= self.resize_stride:
             self.n_resizes += 1
-            self.signal = np.resize(self.signal, ((self.n_resizes*self.resize_stride,)))
+            self.signal = np.resize(self.signal, ((self.n_resizes*self.resize_stride,width)))
             self.resize_count -= self.resize_stride
         self.resize_count += len(sample)
 
         for s in sample:
-            self.signal[self.ndx] = s * self.scaling
+            r = self.ndx // width
+            c = self.ndx % width
+            self.signal[r, c] = s * self.scaling
             self.ndx += 1
 
     def sample_count(self):

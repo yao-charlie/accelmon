@@ -7,6 +7,11 @@
 
 /*
   \brief Initialize GCLK from the CPU 48MHz PLL with a specified clock divider
+
+  \param clk_id the identifier for the GCLK generator (e.g. 5)
+  \param clk_div the division factor, interpretation depends on clk_divsel (0-as scalar multiple, 1-as 2^x)
+  \param clk_divsel the flag for the divisor type, 0 = scalar multiple, 1 = 2^x
+  \param en_gclk_io DEBUG ONLY, requires init_pin_for_CLK_out and routes this GCLK to PA11
 */
 uint32_t init_GCLK(
   int const clk_id, 

@@ -57,6 +57,8 @@ void setup()
   pixels.setPixelColor(0, pixels.Color(0, 96, 0));
   pixels.show();
 
+  delay(1000);
+
   if (!accel.init()) {
     pixels.setPixelColor(0, pixels.Color(96, 0, 0));
     pixels.show();
@@ -115,19 +117,29 @@ int serial_read_uint32(uint32_t& val)
 // H : halt, send last packet then halt packet
 // R# : start with max packets count as string (0=no max), streams packets HDR_DATA | timestamp_ms | T .. | P ..
 // C : configure
+//  general
+//  B# : board ID (24 bits -- upper byte reserved for accelerometer type)
+//  KX134
+//  F# : output data rate (4-bit code, see docs)
+//  G# : g range selection 0=8g, 1=16g, 2=32g, 3=64g
+//  ADXL1005
 //  D# : clock divisor (0-255 for direct, 0-8 for pow2)
 //  M# : clock divisor mode (0=direct, 1=pow2)
 //  P# : ADC prescaler (2^(x + 4))
 //  L# : ADC sample length (half-clock cycles)
-//  B# : board ID (24 bits -- upper byte reserved for accelerometer type)
 // A : ask
+//  general
+//  B : Accelerometer type [24:31] | board ID [0:23]
+//  C : sample count
+//  KX134
+//  F : output data rate (4-bit code)
+//  G : g range selection 0=8g, 1=16g, 2=32g, 3=64g
+//  ADXL1005
 //  F : ADC clock frequency
 //  D : clock divisor
 //  M : clock divisor mode (0=direct, 1 = pow2)
 //  P : ADC prescaler setting
 //  L : ADC sample length
-//  B : Accelerometer type [24:31] | board ID [0:23]
-//  C : sample count
 // Z : reset the board
 void process_serial_buffer()
 {
@@ -181,9 +193,7 @@ void process_serial_buffer()
         count = packet.write_resp(RESP_TYPE_ID, board_id | (accel.type_id() << 24));
       } else {
         auto const resp = accel.get(ask_opt);
-        if (resp.type > 0) {  
-          count = packet.write_resp(resp.type, resp.val);
-        }
+        count = packet.write_resp(resp.type, resp.val); // can be none on fall through
       }
       if (count > 0) {
         Serial.write(packet.buffer(), count);

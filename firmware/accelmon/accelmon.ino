@@ -91,7 +91,7 @@ Adafruit_NeoPixel pixels(1, PIN_NEOPIXEL);
 
 // create an accelerometer
 //ADXL1005 accel;
-KX134 accel(data_ready_ISR, KX134_DRDY_IOPIN);
+KX134 accel(data_ready_ISR, KX134_DRDY_ARDUINO_PIN);
 
 FlashStorage(board_id_store, uint32_t);
 uint32_t board_id;
@@ -135,7 +135,7 @@ void loop()
   // for digitial read (I2C or SPI) from KX134 
   // could probably write direct to packet here
   if (is_running && data_ready) {
-    auto const data = accel.process();
+    auto const data = accel.process();  // 16us
     uint32_t const interval_us = timestamp_curr > timestamp_prev ? 
         timestamp_curr - timestamp_prev : (0xFFFFFFFF - timestamp_prev) + timestamp_curr;
     data_ready = false;

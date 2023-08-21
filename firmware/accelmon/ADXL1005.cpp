@@ -14,7 +14,6 @@ bool ADXL1005::init()
 {
   // currently these are unused or debug only
   init_pin_for_D_out(ADXL1005_ADC_CONV_IOPIN);    // toggles on conversion complete (ADC interrupt)
-  init_pin_for_D_out(ADXL1005_STBY_IOPIN);        // not used, config is TODO
   init_pin_for_D_out(ADXL1005_SELF_TEST_IOPIN);   // not used, config is TODO
   init_pin_for_D_in(ADXL1005_OR_IOPIN);           // not used
 

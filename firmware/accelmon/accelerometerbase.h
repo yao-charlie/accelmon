@@ -8,13 +8,13 @@
 
 // IO Pins for SAMD, i.e PAxx
 #define ADXL1005_SELF_TEST_IOPIN 3    // D1/A1
-#define ADXL1005_STBY_IOPIN 4         // D2/A2
+#define ADXL1005_ADC_CONV_IOPIN 4     // D2/A2
+//#define ADXL1005_STBY_IOPIN 4       // not suppported here 
 #define ADXL1005_OR_IOPIN 5           // D3/A3
-#define ADXL1005_ADC_CONV_IOPIN 6     // D6/A6/TX
-#define ADXL1005_DEBUG_GCLK_IOPIN 11  // D8/A8/SCK
+#define ADXL1005_DEBUG_GCLK_IOPIN 11  // D8/A8/SCK -- debug only
 
-#define KX134_DRDY_IOPIN 7            // D7/A7/RX
-#define KX134_NCS_IOPIN 16            // D4/SDA -- for SPI interface, re-use SDA as CS
+#define KX134_DRDY_ARDUINO_PIN 6      // D6/A6/TX
+#define KX134_NCS_ARDUINO_PIN  7      // D7/A7/RX -- for SPI interface
 // leave SPI & I2C pins free
 
 class AccelerometerBase{

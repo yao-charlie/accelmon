@@ -3,9 +3,9 @@
 
 #include "accelerometerbase.h"
 
-#include <Wire.h>
 #include <SparkFun_KX13X.h> 
 
+#define KX134_BUS_SPI
 
 class KX134 : public AccelerometerBase {
 public:
@@ -41,7 +41,12 @@ public:
 
 private:
 
+#ifdef KX134_BUS_SPI
+  SparkFun_KX134_SPI accel_;
+#else
   SparkFun_KX134 accel_;
+#endif
+
   Config cfg_;
   VoidFunc_T callback_;
   int8_t drdy_int_pin_;

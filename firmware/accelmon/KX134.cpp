@@ -1,5 +1,6 @@
 #include "KX134.h"
-
+#include <SPI.h>
+#include <Wire.h>
 // config response types (0x00-0x0F reserved)
 #define RESP_TYPE_ODR   0x18
 #define RESP_TYPE_GSEL  0x19
@@ -13,13 +14,37 @@ KX134::KX134(VoidFunc_T callback, int int_pin /* = 6*/)
 
 bool KX134::init()
 {
+
+#ifdef KX134_BUS_SPI
+  pinMode(KX134_NCS_ARDUINO_PIN, OUTPUT);
+  digitalWrite(KX134_NCS_ARDUINO_PIN, HIGH);
+
+  SPI.begin();
+  SPISettings spi_settings(4000000, MSBFIRST, SPI_MODE0); // 4MHz, MSB, mode 0,0
+
+  // at 12.8kHz data rate, 78.125us per sample
+  // min packet size is 16*5 = 80 bits at 921600baud ~ 87us == too slow
+  // at 4MHz, transfer 64bits in 16us --> 62us remains
+
+#else
   Wire.begin();
+#endif
+
   delay(50);
+
+#ifdef KX134_BUS_SPI
+  //if (!accel_.begin(KX134_NCS_ARDUINO_PIN)) {
+  
+  if (!accel_.begin(SPI, spi_settings, KX134_NCS_ARDUINO_PIN)) {
+    return false;
+  }
+#else
 
   if (!accel_.begin()) {
     return false;
   }
-  
+#endif
+
   //Serial.println("Ready.");
 
   accel_.softwareReset();

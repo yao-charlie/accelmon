@@ -61,6 +61,7 @@ bool KX134::init()
 
   accel_.setOutputDataRate(cfg_.odata_rate);  // 100Hz default
   
+  return true;
 }
 
 void KX134::start()

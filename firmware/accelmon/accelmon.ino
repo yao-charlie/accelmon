@@ -49,8 +49,8 @@ typedef struct {
   void reset(int16_t const skips=2) 
   {
     skip_count = skips;
-    max_T = 0.0;
-    min_T = 1e38;
+    max_T = 0;
+    min_T = UINT32_MAX;
     M2 = 0.0;
     mu = 0.0;
     n = 0;

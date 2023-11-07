@@ -11,10 +11,12 @@ volatile bool data_ready;
 volatile uint32_t dropped_count;
 volatile uint32_t timestamp_curr;
 volatile uint32_t timestamp_prev;
+volatile bool tach_edge;
 
 RingBuf<uint16_t, 512> adc_val;
 
 bool is_running;
+uint8_t tach_blink_counter;
 
 typedef struct {
   int16_t  skip_count;
@@ -86,6 +88,11 @@ void data_ready_ISR()
   data_ready = true;
 }
 
+void tach_edge_ISR() 
+{
+  tach_edge = true;
+}
+
 // create a pixel strand with 1 pixel on PIN_NEOPIXEL
 Adafruit_NeoPixel pixels(1, PIN_NEOPIXEL);
 
@@ -101,6 +108,12 @@ void setup()
 {
   is_running = false;
   data_ready = false;
+  tach_edge = false;
+  tach_blink_counter = 0;
+  pinMode(TACH_OPEN_COLLECTOR_PIN, INPUT_PULLUP);
+  pinMode(TACH_INDICATOR_LED_PIN, OUTPUT);
+  digitalWrite(TACH_INDICATOR_LED_PIN, 0);
+
   board_id = BOARD_ID_MASK & board_id_store.read();  // upper byte reserved for board type
 
   Serial.begin(921600);
@@ -123,6 +136,7 @@ void setup()
   pixels.clear();
   pixels.show();
 
+
 }
 
 
@@ -135,17 +149,21 @@ void loop()
   // for digitial read (I2C or SPI) from KX134 
   // could probably write direct to packet here
   if (is_running && data_ready) {
+    uint16_t const tach_bit = tach_edge ? 0x8000 : 0;
+    tach_edge = false;  // reset it 
+
     auto const data = accel.process();  // 16us
     uint32_t const interval_us = timestamp_curr > timestamp_prev ? 
         timestamp_curr - timestamp_prev : (0xFFFFFFFF - timestamp_prev) + timestamp_curr;
     data_ready = false;
 
-    // assume that the minimum sample rate is > 16Hz (<65535us period)
-    if (interval_us > 0xFFFFFFFF) {
-      halt_and_blink_until_reset(64,0,0);
-    }
+    // assume that the minimum sample rate is > 32Hz (<32768us period)
+    //if (interval_us > 0x00007FFF) {
+    //  halt_and_blink_until_reset(64,0,0);
+    //}
+    uint16_t const interval_with_flag = (0x7FFF & interval_us) | tach_bit;
 
-    if (adc_val.push((uint16_t)interval_us)) {
+    if (adc_val.push(interval_with_flag)) {
       for (int16_t i = 0; i < data.count; ++i) {
         if (!adc_val.push(data.buf[i])) {
           dropped_count++;
@@ -157,6 +175,8 @@ void loop()
 
     timing_stats.update(interval_us);
   }
+
+  digitalWrite(TACH_INDICATOR_LED_PIN, digitalRead(TACH_OPEN_COLLECTOR_PIN));
 
   uint16_t sample;
   while (adc_val.lockedPop(sample)) {
@@ -263,6 +283,8 @@ void process_serial_buffer()
       is_running = false;
       accel.stop();
       
+      detachInterrupt(digitalPinToInterrupt(TACH_OPEN_COLLECTOR_PIN));
+
       if (dropped_count == 0) {
         pixels.clear();
       } else {
@@ -281,6 +303,8 @@ void process_serial_buffer()
 
       pixels.setPixelColor(0, pixels.Color(0, 0, 96));
       pixels.show();
+
+      attachInterrupt(digitalPinToInterrupt(TACH_OPEN_COLLECTOR_PIN), tach_edge_ISR, FALLING);
 
       reset_for_data_collection();
       is_running = true;

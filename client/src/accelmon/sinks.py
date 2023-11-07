@@ -14,13 +14,17 @@ class RawValueConverter:
         pass
 
 class NoConversionConverter (RawValueConverter):
-    """Do nothing"""
+    """Do nothing, return the tuple of the value and a zero flag bit"""
     def conv(self, v, i):
-        return v
+        return v, None
 
 
 class IntervalSignedInt16Converter (RawValueConverter):
-    """Interpret raw values as signed int 16 and scale to float"""
+    """
+    Interpret raw values as signed int 16 and scale to float. 
+    The first column is an interval in (us) with the upper bit set if 
+    the tach signal is present.
+    """
 
     def __init__(self, cols=4, scaling=1.):
         self.cols = cols
@@ -28,10 +32,11 @@ class IntervalSignedInt16Converter (RawValueConverter):
 
     def conv(self, v, i):
         if i % self.cols == 0:  # first entry in row is interval (us) as uint16_t
-            return v
+            tach_bit = 1 if 0x8000 & int(v) else 0
+            return (int(v) & 0x7FFF), tach_bit
         b = int(v).to_bytes(2,'little')
         c = struct.unpack('<h',b)[0]
-        return self.a * c
+        return self.a * c, None
 
 
 class SampleSink:
@@ -77,7 +82,9 @@ class CsvSampleSink (SampleSink):
 
     def write(self, sample):
         for s in sample:
-            v = self.converter.conv(s,self.n_samples)
+            v, b = self.converter.conv(s,self.n_samples)
+            if b is not None:
+                self.hf.write(f"{b},")
             self.hf.write(f"{v}")
             self.n_samples += 1
             if self.n_samples % self.width == 0:

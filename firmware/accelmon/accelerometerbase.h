@@ -7,15 +7,17 @@
 #define TYPE_ID_KX134     0x02
 
 // IO Pins for SAMD, i.e PAxx
-#define ADXL1005_SELF_TEST_IOPIN 3    // D1/A1
-#define ADXL1005_ADC_CONV_IOPIN 4     // D2/A2
-//#define ADXL1005_STBY_IOPIN 4       // not suppported here 
-#define ADXL1005_OR_IOPIN 5           // D3/A3
-#define ADXL1005_DEBUG_GCLK_IOPIN 11  // D8/A8/SCK -- debug only
+#define ADXL1005_ADC_CONV_IOPIN 5     // D3/A3 -- debug only
+//#define ADXL1005_STBY_IOPIN 4         // not supported
+#define ADXL1005_SELF_TEST_IOPIN 16   // TODO move to SDA/D4
+#define ADXL1005_OR_IOPIN 17          // TODO move to SCL/D5
+#define ADXL1005_DEBUG_GCLK_IOPIN 11  // D8/A8/SCK -- debug only, conflicts with SPI iface for KX134
 
+#define TACH_OPEN_COLLECTOR_PIN 1     // D1/A1
+#define TACH_INDICATOR_LED_PIN 2      // D2/A2
 #define KX134_DRDY_ARDUINO_PIN 6      // D6/A6/TX
 #define KX134_NCS_ARDUINO_PIN  7      // D7/A7/RX -- for SPI interface
-// leave SPI & I2C pins free
+// leave SPI & I2C pins free -- KX can go on SPI, leaves I2C  for OR/STBY (future)
 
 class AccelerometerBase{
 public:

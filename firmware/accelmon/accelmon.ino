@@ -12,6 +12,7 @@ volatile uint32_t dropped_count;
 volatile uint32_t timestamp_curr;
 volatile uint32_t timestamp_prev;
 volatile bool tach_edge;
+volatile bool tach_state; 
 
 RingBuf<uint16_t, 512> adc_val;
 
@@ -85,6 +86,7 @@ void data_ready_ISR()
   if (data_ready) { // not cleared
     dropped_count++;
   }
+  tach_state = digitalRead(TACH_OPEN_COLLECTOR_PIN);
   data_ready = true;
 }
 
@@ -149,7 +151,7 @@ void loop()
   // for digitial read (I2C or SPI) from KX134 
   // could probably write direct to packet here
   if (is_running && data_ready) {
-    uint16_t const tach_bit = digitalRead(TACH_OPEN_COLLECTOR_PIN) ? 0x8000 : 0;
+    uint16_t const tach_bit = tach_state ? 0x8000 : 0;
     //uint16_t const tach_bit = tach_edge ? 0x8000 : 0;
     tach_edge = false;  // reset it 
 

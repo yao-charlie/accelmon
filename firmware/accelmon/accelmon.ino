@@ -149,7 +149,8 @@ void loop()
   // for digitial read (I2C or SPI) from KX134 
   // could probably write direct to packet here
   if (is_running && data_ready) {
-    uint16_t const tach_bit = tach_edge ? 0x8000 : 0;
+    uint16_t const tach_bit = digitalRead(TACH_OPEN_COLLECTOR_PIN) ? 0x8000 : 0;
+    //uint16_t const tach_bit = tach_edge ? 0x8000 : 0;
     tach_edge = false;  // reset it 
 
     auto const data = accel.process();  // 16us
@@ -283,7 +284,7 @@ void process_serial_buffer()
       is_running = false;
       accel.stop();
       
-      detachInterrupt(digitalPinToInterrupt(TACH_OPEN_COLLECTOR_PIN));
+      //detachInterrupt(digitalPinToInterrupt(TACH_OPEN_COLLECTOR_PIN));
 
       if (dropped_count == 0) {
         pixels.clear();
@@ -304,7 +305,7 @@ void process_serial_buffer()
       pixels.setPixelColor(0, pixels.Color(0, 0, 96));
       pixels.show();
 
-      attachInterrupt(digitalPinToInterrupt(TACH_OPEN_COLLECTOR_PIN), tach_edge_ISR, FALLING);
+      //attachInterrupt(digitalPinToInterrupt(TACH_OPEN_COLLECTOR_PIN), tach_edge_ISR, FALLING);
 
       reset_for_data_collection();
       is_running = true;

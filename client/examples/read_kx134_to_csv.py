@@ -1,5 +1,8 @@
 import sys
 sys.path.append('../src/accelmon')
+import os
+from datetime import datetime
+
 
 import logging
 import threading
@@ -20,11 +23,13 @@ if __name__ == "__main__":
             help='Collection time for sampling (s). Default is 0 (no timeout)')
     parser.add_argument('-p', '--port', default='/dev/ttyACM0',  
             help='Serial port name. Default is /dev/ttyACM0.')
-    parser.add_argument('filename', help='CSV file for data output')
+    parser.add_argument('filename', help='CSV file for data output, appended with port and timestamp')
     args = parser.parse_args()
 
     logging.info("Starting demo")
     logging.info(args)
+
+    (prefix, extension) = os.path.splitext(args.filename)  
     
     peek = board.Controller(port=args.port)
     b_id, accel_type = peek.board_id()
@@ -38,8 +43,13 @@ if __name__ == "__main__":
         gscaling = 1./(2**(15 - (3 + gsel)))
         converter = IntervalSignedInt16Converter(scaling=gscaling) 
 
-    logging.info("Creating sink {}".format(args.filename))
-    csv = CsvSampleSink(args.filename, width=values_per_conversion, converter=converter)
+    port_label = args.port.split('/')[-1] 
+    sink_name = '_'.join(port_label)
+
+    timed_named_filename = "{}-{}-{}.{}}".format(args.filename, sink_name, datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"), extension)
+
+    logging.info("Creating sink {}".format(timed_named_filename))
+    csv = CsvSampleSink(timed_named_filename, width=values_per_conversion, converter=converter)
     csv.open()
     
     mon = board.Controller(port=args.port, sinks=[csv])

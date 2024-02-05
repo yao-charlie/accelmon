@@ -1,5 +1,6 @@
 import serial
 import struct
+import datetime
 import threading
 
 class BadHeader(Exception):
@@ -385,6 +386,8 @@ class Controller:
                     raise BadHeader("Unexpected header type (data): 0x{:x}".format(hdr[0]))
                 
                 raw_data = [struct.unpack('>H',ser.read(size=2))[0] for i in range(word_count)]
+                #Not sure what format would be preferable but this is at least consistemt with the filename
+                raw_data.append(datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"))
                 sample_count += len(raw_data)
 
                 for sink in self.sinks:

@@ -80,17 +80,30 @@ class CsvSampleSink (SampleSink):
             self.hf.close()
         self.hf = None
 
-    def write(self, sample):
+    def write(self, sample, port=0, queue=False):
+
+        queueAggregator = []
+
         for s in sample:
+            print('new sample s')
+            print(s)
+
             v, b = self.converter.conv(s,self.n_samples)
+
             if b is not None:
                 self.hf.write(f"{b},")
             self.hf.write(f"{v}")
             self.n_samples += 1
             if self.n_samples % self.width == 0:
                 self.hf.write("\n")
+                queueAggregator.append(v)
+                if queue:
+                    queue.put(queueAggregator)
+                print(queueAggregator)
+                queueAggregator=[]
             else:
                 self.hf.write(",")
+                queueAggregator.append(v)
 
     def sample_count(self):
         return self.n_samples

@@ -354,7 +354,7 @@ class Controller:
         """Request a stop of the collection of samples."""
         self.user_halt = True
 
-    def collect_samples(self, max_samples=0):
+    def collect_samples(self, max_samples=0, port=False, queue=False):
         """Start the free-running collection of ADC samples
 
         :param max_samples: The maximum number of samples to collect. Set to zero
@@ -391,6 +391,8 @@ class Controller:
                 sample_count += len(raw_data)
 
                 for sink in self.sinks:
+                    print('new data')
+                    print(raw_data)
                     sink.write(raw_data)
         
             if self.user_halt:

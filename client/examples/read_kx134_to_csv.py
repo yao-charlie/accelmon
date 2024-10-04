@@ -46,7 +46,7 @@ if __name__ == "__main__":
     port_label = args.port.split('/')[-1] 
     sink_name = '_'.join(port_label)
 
-    timed_named_filename = "{}-{}-{}.{}".format(args.filename, sink_name, datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"), extension)
+    timed_named_filename = "{}-{}-{}{}".format(args.filename, sink_name, datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"), extension)
 
     logging.info("Creating sink {}".format(timed_named_filename))
     csv = CsvSampleSink(timed_named_filename, width=values_per_conversion, converter=converter)

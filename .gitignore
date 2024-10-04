@@ -53,6 +53,7 @@ dkms.conf
 
 # Python
 __pycache__/
+.venv/
 
 
 # Build

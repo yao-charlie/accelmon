@@ -89,7 +89,6 @@ class CsvSampleSink (SampleSink):
             print(s)
 
             v, b = self.converter.conv(s,self.n_samples)
-
             if b is not None:
                 self.hf.write(f"{b},")
             self.hf.write(f"{v}")

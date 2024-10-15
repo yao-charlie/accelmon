@@ -44,7 +44,7 @@ if __name__ == "__main__":
         converter = IntervalSignedInt16Converter(scaling=gscaling) 
 
     port_label = args.port.split('/')[-1] 
-    sink_name = '_'.join(port_label)
+    sink_name = ''.join(port_label)
 
     timed_named_filename = "{}-{}-{}{}".format(args.filename, sink_name, datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"), extension)
 

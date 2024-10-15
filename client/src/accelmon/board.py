@@ -1,6 +1,6 @@
 import serial
 import struct
-import datetime
+from datetime import datetime
 import threading
 
 class BadHeader(Exception):
@@ -387,13 +387,18 @@ class Controller:
                 
                 raw_data = [struct.unpack('>H',ser.read(size=2))[0] for i in range(word_count)]
                 #Not sure what format would be preferable but this is at least consistemt with the filename
-                raw_data.append(datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"))
+                # raw_data.append(datetime.now().strftime("%Y-%m-%d_%Hh-%Mm-%Ss"))
+                # raw_data.append(int(datetime.now().timestamp()))
                 sample_count += len(raw_data)
 
+
                 for sink in self.sinks:
-                    print('new data')
-                    print(raw_data)
-                    sink.write(raw_data)
+                    # print('new data')
+                    # print(int(datetime.now().timestamp()))
+                    # print((datetime.now().timestamp()))
+                    # print(raw_data)
+                    sink.write(raw_data, port, queue)
+                    # sink.write(raw_data)
         
             if self.user_halt:
                 ser.write(bytes("H","utf-8"))

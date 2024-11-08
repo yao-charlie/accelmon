@@ -2,6 +2,7 @@ import serial
 import struct
 from datetime import datetime
 import threading
+import time
 
 class BadHeader(Exception):
     """An error in the packet header"""
@@ -354,7 +355,7 @@ class Controller:
         """Request a stop of the collection of samples."""
         self.user_halt = True
 
-    def collect_samples(self, max_samples=0, port=False, queue=False):
+    def collect_samples(self, max_samples=0, port=False, queue=False, accelRate=1.0):
         """Start the free-running collection of ADC samples
 
         :param max_samples: The maximum number of samples to collect. Set to zero
@@ -366,9 +367,11 @@ class Controller:
         sample_count = 0
         writer_thread = None
         write_data = []
+        queueAggregator = []
         with self.comm as ser:
             msg = bytes("R","utf-8")+ struct.pack('<I',max_samples)
             ser.write(msg)
+            start = time.time()
             while not (self.user_halt 
                     or (max_samples > 0 and sample_count >= max_samples)):
 
@@ -393,12 +396,16 @@ class Controller:
 
 
                 for sink in self.sinks:
+
                     # print('new data')
                     # print(int(datetime.now().timestamp()))
                     # print((datetime.now().timestamp()))
                     # print(raw_data)
-                    sink.write(raw_data, port, queue)
+                    newStart, queueAggregator = sink.write(raw_data, port, queue, accelRate, start, queueAggregator)
                     # sink.write(raw_data)
+                    # print(newStart)
+                    if (newStart - start) > accelRate:
+                        start = newStart
         
             if self.user_halt:
                 ser.write(bytes("H","utf-8"))

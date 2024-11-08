@@ -80,8 +80,10 @@ class CsvSampleSink (SampleSink):
             self.hf.close()
         self.hf = None
 
-    def write(self, sample, port=0, queue=False):
-        queueAggregator = []
+    def write(self, sample, port=0, queue=False, accelRate=1.0, start=time.time(), queueAggregator=[]):
+        # queueAggregator = []
+        queueLineAggregator=[]
+        # start = time.time()
 
         for s in sample:
             # print('new sample s')
@@ -93,17 +95,36 @@ class CsvSampleSink (SampleSink):
             if b is not None:
                 self.hf.write(f"{b},")
             self.hf.write(f"{v}")
+            queueLineAggregator.append(v)
+            # print(queueLineAggregator)
             self.n_samples += 1
             if self.n_samples % self.width == 0:
                 self.hf.write("\n")
-                queueAggregator.append(v)
-                # if queue.qsize()<2:
-                queue.put([port, queueAggregator])
+                queueAggregator.append(queueLineAggregator)
+                # print(queueLineAggregator)
                 # print(queueAggregator)
-                queueAggregator=[]
+                queueLineAggregator=[]
+
+
+
+                # queueAggregator.append(v)
+                # print(queueAggregator)
+
             else:
                 self.hf.write(",")
-                queueAggregator.append(v)
+                # queueAggregator.append(v)
+
+            # print('queue write?')
+            # print(time.time() - start)
+            # print(accelRate)
+            if (time.time() - start >= accelRate) and queue.qsize()<2:
+                # print('putting queue')
+                # print(queueAggregator)
+                queue.put([port, queueAggregator])
+                queueAggregator=[]
+                start = time.time()
+        return start, queueAggregator
+        
 
     def sample_count(self):
         return self.n_samples
